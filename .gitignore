@@ -29,3 +29,7 @@ docs/superpowers/
 
 # 生产数据库导出（含真实文章与用户数据），不得进仓库
 backups/
+# 本地密钥文件（含真实凭据，禁止入库）
+secrets.json
+secrets.clean.json
+.cf-api-token.tmp
