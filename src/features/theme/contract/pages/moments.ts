@@ -1,0 +1,34 @@
+import type { JSONContent } from "@tiptap/react";
+import type { MomentWithStats } from "@/features/moments/moments.schema";
+
+export interface MomentsPageProps {
+  /** 动态列表（最新在前） */
+  moments: Array<MomentWithStats>;
+  /** 当前浏览者是否为管理员（用于展示发布/删除入口） */
+  isAdmin: boolean;
+  /** 当前浏览者是否为超级管理员（超管可管理所有动态；普通管理员仅可管理自己的） */
+  isSuperAdmin: boolean;
+  /** 当前登录用户 id */
+  currentUserId?: string | null;
+  /** 点赞 / 取消点赞，返回是否成功 */
+  onToggleLike: (momentId: number) => Promise<boolean>;
+  /** 发布动态（管理员），返回是否成功 */
+  onCreateMoment: (content: JSONContent, images: string[]) => Promise<boolean>;
+  /** 编辑动态（管理员），返回是否成功 */
+  onUpdateMoment: (
+    id: number,
+    content: JSONContent,
+    images: string[],
+  ) => Promise<boolean>;
+  /** 删除动态（管理员），返回是否成功 */
+  onDeleteMoment: (id: number) => Promise<boolean>;
+  /** 当前页码（从 1 开始） */
+  page: number;
+  /** 每页数量 */
+  pageSize: number;
+  /** 动态总数 */
+  total: number;
+  hasPrevPage: boolean;
+  hasNextPage: boolean;
+  onPageChange: (page: number) => void;
+}

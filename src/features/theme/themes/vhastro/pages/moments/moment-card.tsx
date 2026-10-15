@@ -1,0 +1,239 @@
+import { ClientOnly } from "@tanstack/react-router";
+import type { JSONContent } from "@tiptap/react";
+import { Heart, Loader2, MessageCircle, Pencil, Trash2 } from "lucide-react";
+import { lazy, Suspense, useState } from "react";
+import { Button } from "@/components/ui/button";
+import ConfirmationModal from "@/components/ui/confirmation-modal";
+import { collectImageUrls } from "@/features/moments/components/moment-editor-config";
+import type { MomentWithStats } from "@/features/moments/moments.schema";
+import { cn, formatDate } from "@/lib/utils";
+import { m } from "@/paraglide/messages";
+import { renderCommentReact } from "../../components/comments/view/comment-render";
+import { VhastroCommentSection } from "../../components/comments/view/comment-section";
+
+// TipTap 编辑器体积大，且仅在管理员编辑动态时挂载，按需加载
+const MomentEditor = lazy(() =>
+  import("@/features/moments/components/moment-editor").then((mod) => ({
+    default: mod.MomentEditor,
+  })),
+);
+
+interface MomentCardProps {
+  moment: MomentWithStats;
+  isAdmin: boolean;
+  isSuperAdmin: boolean;
+  currentUserId?: string | null;
+  onToggleLike: (momentId: number) => Promise<boolean>;
+  onDelete: (id: number) => Promise<boolean>;
+  onUpdate: (
+    id: number,
+    content: JSONContent,
+    images: string[],
+  ) => Promise<boolean>;
+}
+
+export function MomentCard({
+  moment,
+  isAdmin,
+  isSuperAdmin,
+  currentUserId,
+  onToggleLike,
+  onDelete,
+  onUpdate,
+}: MomentCardProps) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [liking, setLiking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 超管可管理所有动态；普通管理员仅可管理自己发布的动态
+  const canManage =
+    isAdmin &&
+    (isSuperAdmin || moment.authorUserId === currentUserId);
+
+  const isLiked = moment.isLiked;
+
+  const handleToggleLike = async () => {
+    if (liking) return;
+    setLiking(true);
+    try {
+      await onToggleLike(moment.id);
+    } finally {
+      setLiking(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    try {
+      await onDelete(moment.id);
+    } finally {
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const handleEditSubmit = async (content: JSONContent): Promise<boolean> => {
+    if (isSubmitting) return false;
+    const images = collectImageUrls(content);
+    setIsSubmitting(true);
+    try {
+      const ok = await onUpdate(moment.id, content, images);
+      if (ok) setEditing(false);
+      return ok;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <article className="vhastro-card-base p-6 md:p-8">
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-full bg-muted/30 border border-border/20 overflow-hidden flex items-center justify-center">
+            {moment.author?.image ? (
+              <img
+                src={moment.author.image}
+                alt={moment.author.name ?? ""}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                {moment.author?.name?.slice(0, 1) || "?"}
+              </span>
+            )}
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-sm font-bold vhastro-text-90 transition-colors">
+              {moment.author?.name || m.moments_anonymous()}
+            </p>
+            <p className="text-[10px] font-mono vhastro-text-30 transition-colors uppercase tracking-widest">
+              <ClientOnly fallback="-">
+                {formatDate(moment.createdAt, { includeTime: true })}
+              </ClientOnly>
+            </p>
+          </div>
+        </div>
+
+        {canManage && (
+          <div className="flex items-center gap-1">
+            {!editing && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditing(true)}
+                className="h-auto p-1 vhastro-text-30 hover:text-foreground bg-transparent hover:bg-transparent"
+              >
+                <Pencil size={14} />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDeleteModal(true)}
+              className="h-auto p-1 vhastro-text-30 hover:text-red-500 bg-transparent hover:bg-transparent"
+            >
+              <Trash2 size={14} />
+            </Button>
+          </div>
+        )}
+      </header>
+
+      {/* Content / Editor */}
+      {editing ? (
+        <div className="mt-5">
+          <Suspense fallback={null}>
+            <MomentEditor
+              onSubmit={handleEditSubmit}
+              isSubmitting={isSubmitting}
+              initialContent={moment.content}
+              onCancel={() => setEditing(false)}
+            />
+          </Suspense>
+        </div>
+      ) : (
+        <>
+          {moment.content ? (
+            <div className="vhastro-custom-md mt-5 text-sm leading-relaxed vhastro-text-70 transition-colors">
+              {renderCommentReact(moment.content)}
+            </div>
+          ) : null}
+        </>
+      )}
+
+      {/* Images */}
+      {moment.images.length > 0 && !editing && (
+        <div
+          className={cn(
+            "mt-5 grid gap-3",
+            moment.images.length === 1
+              ? "grid-cols-1"
+              : moment.images.length === 2
+                ? "grid-cols-2"
+                : "grid-cols-2 md:grid-cols-3",
+          )}
+        >
+          {moment.images.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt=""
+              loading="lazy"
+              className="w-full h-full object-cover rounded-xl border border-border/30"
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Actions */}
+      {!editing && (
+        <footer className="mt-6 flex items-center gap-6 pt-5 border-t border-border/20">
+          <button
+            type="button"
+            onClick={handleToggleLike}
+            disabled={liking}
+            className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest vhastro-text-40 hover:vhastro-text-90 transition-colors disabled:opacity-50"
+          >
+            {liking ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Heart
+                size={14}
+                className={cn(isLiked && "fill-current text-red-500")}
+              />
+            )}
+            {moment.likeCount}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCommentsOpen((open) => !open)}
+            className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest vhastro-text-40 hover:vhastro-text-90 transition-colors disabled:opacity-50"
+          >
+            <MessageCircle size={14} />
+            {moment.commentCount}
+          </button>
+        </footer>
+      )}
+
+      {commentsOpen && !editing && (
+        <div className="mt-5 pt-5 border-t border-border/20">
+          <VhastroCommentSection momentId={moment.id} />
+        </div>
+      )}
+
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        title={m.moments_delete_confirm_title()}
+        message={m.moments_delete_confirm_message()}
+        confirmLabel={m.moments_delete_confirm_btn()}
+        isDanger
+        isLoading={deleting}
+      />
+    </article>
+  );
+}

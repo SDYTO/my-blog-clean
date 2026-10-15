@@ -1,0 +1,159 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { MEDIA_KEYS } from "@/features/media/queries";
+import { updatePostFn as adminUpdatePostFn } from "@/features/posts/api/posts.admin.api";
+import { PostEditor } from "@/features/posts/components/post-editor";
+import { PostEditorSkeleton } from "@/features/posts/components/post-editor/post-editor-skeleton";
+import type { PostEditorData } from "@/features/posts/components/post-editor/types";
+import { POSTS_KEYS, postByIdQuery } from "@/features/posts/queries";
+import { setPostTagsFn } from "@/features/tags/api/tags.api";
+import {
+  TAGS_KEYS,
+  tagsAdminQueryOptions,
+  tagsByPostIdQueryOptions,
+} from "@/features/tags/queries";
+import { getPostAuthorManagerFn } from "@/features/users/api/users.admin.api";
+import { isFuwari } from "@/lib/theme-mode";
+import { m } from "@/paraglide/messages";
+
+export const Route = createFileRoute("/admin/posts/edit/$id")({
+  ssr: "data-only",
+  component: EditPost,
+  pendingComponent: PostEditorSkeleton,
+  loader: async ({ context, params }) => {
+    const postId = Number(params.id);
+    const [post, _] = await Promise.all([
+      context.queryClient.ensureQueryData(postByIdQuery(postId)),
+      context.queryClient.ensureQueryData(tagsByPostIdQueryOptions(postId)),
+      // Prefetch all tags for the selector
+      context.queryClient.prefetchQuery(tagsAdminQueryOptions()),
+    ]);
+    return { title: post?.title };
+  },
+  head: ({ loaderData }) => ({
+    meta: [
+      {
+        title: loaderData?.title,
+      },
+    ],
+  }),
+});
+
+function EditPost() {
+  const { id } = Route.useParams();
+  const postId = Number(id);
+  const queryClient = useQueryClient();
+
+  // Use useQuery instead of useSuspenseQuery to prevent flickering on background refetches
+  // Since loader ensures data is in cache, these will have initial data immediately.
+  const { data: post } = useQuery(postByIdQuery(postId));
+  const { data: tags } = useQuery(tagsByPostIdQueryOptions(postId));
+  const { data: authorManager } = useQuery({
+    queryKey: ["posts", "author-manager"],
+    queryFn: () => getPostAuthorManagerFn(),
+  });
+
+  if (!post || !tags) {
+    if (isFuwari) {
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="fuwari-card-base p-4 sm:p-5 md:p-6 text-center">
+            <h2 className="text-xl font-bold fuwari-text-90">
+              {m.admin_post_edit_not_found_title()}
+            </h2>
+            <p className="text-sm fuwari-text-50 mt-2">
+              {m.admin_post_edit_not_found_desc({ id: String(postId) })}
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center justify-center h-[50vh]">
+        <div className="text-center space-y-4">
+          <h2 className="text-4xl font-serif font-medium">
+            {m.admin_post_edit_not_found_title()}
+          </h2>
+          <p className="text-zinc-400 font-light text-sm">
+            {m.admin_post_edit_not_found_desc({ id: String(postId) })}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const initialData = {
+    id: post.id,
+    title: post.title,
+    summary: post.summary ?? "",
+    slug: post.slug,
+    status: post.status,
+    readTimeInMinutes: post.readTimeInMinutes,
+    contentJson: post.contentJson,
+    publishedAt: post.publishedAt,
+    tagIds: tags.map((t) => t.id),
+    skillId: post.skillId,
+    pinnedAt: post.pinnedAt,
+    authorId: post.authorId,
+    author: post.author,
+    isSynced: post.isSynced,
+    hasPublicCache: post.hasPublicCache,
+    visibility: post.visibility,
+    password: post.password ?? "",
+    passwordChannel: post.passwordChannel ?? "",
+    passwordHint: post.passwordHint ?? "",
+  };
+
+  const handleSave = async (data: PostEditorData) => {
+    const publishedAt =
+      data.status === "published" && !post.publishedAt
+        ? new Date()
+        : data.publishedAt;
+
+    // Parallelize updates
+    const [updateResult] = await Promise.all([
+      adminUpdatePostFn({
+        data: {
+          id: post.id,
+          data: {
+            ...data,
+            publishedAt,
+          },
+        },
+      }),
+      setPostTagsFn({
+        data: {
+          postId: post.id,
+          tagIds: data.tagIds,
+        },
+      }),
+    ]);
+
+    if (updateResult.error) {
+      throw new Error(m.admin_post_edit_error_not_found());
+    }
+
+    // Invalidate cache to ensure fresh data on next visit
+    queryClient.invalidateQueries({ queryKey: POSTS_KEYS.detail(postId) });
+    // Invalidate lists and counts, but keep other details cached
+    queryClient.invalidateQueries({ queryKey: POSTS_KEYS.lists });
+    queryClient.invalidateQueries({ queryKey: POSTS_KEYS.adminLists });
+    queryClient.invalidateQueries({ queryKey: POSTS_KEYS.counts });
+
+    queryClient.invalidateQueries({ queryKey: TAGS_KEYS.postTags(postId) });
+    queryClient.invalidateQueries({ queryKey: TAGS_KEYS.admin });
+    // Replaces predicate: matches ["media", "linked-keys", ...]
+    queryClient.invalidateQueries({
+      queryKey: MEDIA_KEYS.linked,
+    });
+  };
+
+  return (
+    <PostEditor
+      initialData={initialData}
+      canEditAuthor={authorManager?.canEdit ?? false}
+      authorCandidates={authorManager?.accounts ?? []}
+      onSave={handleSave}
+    />
+  );
+}

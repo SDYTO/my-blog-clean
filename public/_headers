@@ -1,0 +1,29 @@
+# Cloudflare Workers 静态资源缓存策略
+# 目的：让 Vite 生成的「内容哈希」资源在浏览器与边缘长期缓存，
+# 重复访问不再回源，降低 Worker 请求量与带宽消耗；图片等低频变更资源适度缓存。
+#
+# 注意：/assets/* 下的文件名均带内容哈希，内容变更必然换名，可安全长期缓存。
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/images/*
+  Cache-Control: public, max-age=604800
+
+/favicon.ico
+  Cache-Control: public, max-age=604800
+
+/favicon.svg
+  Cache-Control: public, max-age=604800
+
+/favicon-96x96.png
+  Cache-Control: public, max-age=604800
+
+/apple-touch-icon.png
+  Cache-Control: public, max-age=604800
+
+/web-app-manifest-192x192.png
+  Cache-Control: public, max-age=604800
+
+/web-app-manifest-512x512.png
+  Cache-Control: public, max-age=604800

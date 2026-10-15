@@ -1,0 +1,31 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+*.log
+count.txt
+.env
+.dev.vars
+.nitro
+.tanstack
+.wrangler
+.output
+.vinxi
+todos.json
+drizzle
+tmp/
+test.http
+.secrets
+wrangler.jsonc
+# 本地/生产临时变体（由 wrangler:prepare 生成，含真实资源 ID，不入库）
+wrangler.prod.jsonc
+wrangler.local.jsonc
+docs/superpowers/
+.cache/
+*.tsbuildinfo
+.fallow
+.scratch/
+
+# 生产数据库导出（含真实文章与用户数据），不得进仓库
+backups/

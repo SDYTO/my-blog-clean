@@ -1,0 +1,175 @@
+import { z } from "zod";
+import type { Messages } from "@/lib/i18n";
+
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+export const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
+
+// ── Media Provider Types ─────────────────────────────────────
+export const MEDIA_PROVIDER_TYPES = [
+  "r2",
+  "s3",
+  "api-key",
+  "telegram",
+  "discord",
+  "huggingface",
+  "webdav",
+] as const;
+export type MediaProviderType = (typeof MEDIA_PROVIDER_TYPES)[number];
+
+export interface MediaProvider {
+  id: string;
+  name: string;
+  type: MediaProviderType;
+  canList: boolean;
+  canDelete: boolean;
+  canUpload: boolean;
+  canCreateFolder: boolean;
+  canRename?: boolean;
+  canMove?: boolean;
+  isDefault?: boolean;
+  /** 渠道上传大小上限（字节）；null/undefined = 无固定上限 */
+  maxFileSizeBytes?: number | null;
+}
+
+export const UploadMediaInputSchema = z.instanceof(FormData);
+
+export interface ParseUploadMediaOptions {
+  /** 媒体库管理员上传任意文件类型时为 true（仅 admin 接口可用） */
+  allowAnyFileType?: boolean;
+  /** 覆盖默认大小上限（字节） */
+  maxSizeBytes?: number;
+}
+
+export function parseUploadMediaInput(
+  formData: FormData,
+  messages: Messages,
+  options?: ParseUploadMediaOptions,
+) {
+  const file = formData.get("image");
+  if (!(file instanceof File)) {
+    throw new Error(messages.media_validation_file_required());
+  }
+  const maxSize = options?.maxSizeBytes ?? MAX_FILE_SIZE;
+  if (file.size > maxSize) {
+    throw new Error(messages.media_validation_file_too_large());
+  }
+  if (!options?.allowAnyFileType && !ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+    throw new Error(messages.media_validation_file_invalid_type());
+  }
+
+  const folderRaw = formData.get("folder");
+  const folder = typeof folderRaw === "string" ? folderRaw.trim() : "";
+
+  return { file, folder };
+}
+
+export const MediaKeyInputSchema = z.object({
+  key: z.string(),
+});
+
+export function assertMediaKey(key: string, messages: Messages) {
+  const trimmedKey = key.trim();
+  if (trimmedKey.length === 0) {
+    throw new Error(messages.media_validation_key_required());
+  }
+
+  return trimmedKey;
+}
+
+export const UpdateMediaNameInputSchema = z.object({
+  key: z.string().min(1),
+  name: z.string().min(1),
+  providerId: z.string().optional(),
+});
+
+export const GetMediaListInputSchema = z.object({
+  cursor: z.number().optional(),
+  limit: z.number().optional(),
+  search: z.string().optional(),
+  unusedOnly: z.boolean().optional(),
+});
+
+export const GetMediaDirectoryInputSchema = z.object({
+  folder: z.string().max(500).default(""),
+  cursor: z.string().optional(),
+  limit: z.number().optional(),
+  search: z.string().optional(),
+  unusedOnly: z.boolean().optional(),
+});
+
+export const CreateMediaFolderInputSchema = z.object({
+  name: z.string().min(1).max(200),
+  parent: z.string().max(500).default(""),
+});
+
+export const RenameMediaFolderInputSchema = z.object({
+  key: z.string().min(1),
+  name: z.string().min(1).max(200),
+  providerId: z.string().optional(),
+});
+
+export const DeleteMediaFoldersInputSchema = z.object({
+  keys: z.array(z.string().min(1)).min(1).max(500),
+  providerId: z.string().optional(),
+});
+
+export type UpdateMediaNameInput = z.infer<typeof UpdateMediaNameInputSchema>;
+export type GetMediaListInput = z.infer<typeof GetMediaListInputSchema>;
+export type GetMediaDirectoryInput = z.infer<
+  typeof GetMediaDirectoryInputSchema
+>;
+export type CreateMediaFolderInput = z.infer<
+  typeof CreateMediaFolderInputSchema
+>;
+export type RenameMediaFolderInput = z.infer<
+  typeof RenameMediaFolderInputSchema
+>;
+export type DeleteMediaFoldersInput = z.infer<
+  typeof DeleteMediaFoldersInputSchema
+>;
+
+// ── External Provider Operations ─────────────────────────────
+export const ListExternalDirectoryInputSchema = z.object({
+  providerId: z.string().min(1),
+  folder: z.string().max(500).default(""),
+  continuationToken: z.string().optional(),
+  search: z.string().optional(),
+});
+
+export const UploadToProviderInputSchema = z.object({
+  providerId: z.string().min(1),
+  folder: z.string().default(""),
+});
+
+export const DeleteExternalFilesInputSchema = z.object({
+  providerId: z.string().min(1),
+  keys: z.array(z.string().min(1)).min(1).max(100),
+});
+
+export const MoveMediaFileInputSchema = z.object({
+  key: z.string().min(1),
+  targetFolder: z.string(),
+  providerId: z.string().optional(),
+});
+
+export const MoveMediaFilesInputSchema = z.object({
+  keys: z.array(z.string().min(1)).min(1).max(200),
+  targetFolder: z.string(),
+  providerId: z.string().optional(),
+});
+
+export type ListExternalDirectoryInput = z.infer<
+  typeof ListExternalDirectoryInputSchema
+>;
+export type UploadToProviderInput = z.infer<typeof UploadToProviderInputSchema>;
+export type DeleteExternalFilesInput = z.infer<
+  typeof DeleteExternalFilesInputSchema
+>;
+export type MoveMediaFileInput = z.infer<typeof MoveMediaFileInputSchema>;
+export type MoveMediaFilesInput = z.infer<typeof MoveMediaFilesInputSchema>;

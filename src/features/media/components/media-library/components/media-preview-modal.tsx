@@ -1,0 +1,717 @@
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import {
+  Calendar,
+  Check,
+  Copy,
+  Download,
+  ExternalLink,
+  FileText,
+  FolderInput,
+  HardDrive,
+  Layout,
+  Link2,
+  Loader2,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { getLinkedPostsFn } from "@/features/media/api/media.api";
+import type {
+  MediaDirectoryFile,
+  MediaFolder,
+} from "@/features/media/components/media-library/types";
+import { MEDIA_KEYS } from "@/features/media/queries";
+import { formatCopyLink, type CopyLinkFormat } from "@/features/media/utils/media.utils";
+import { useDelayUnmount } from "@/hooks/use-delay-unmount";
+import { isFuwari } from "@/lib/theme-mode";
+import { cn, formatBytes } from "@/lib/utils";
+import { m } from "@/paraglide/messages";
+import { FolderDropdown } from "./folder-dropdown";
+
+interface MediaPreviewModalProps {
+  asset: MediaDirectoryFile | null;
+  onClose: () => void;
+  onUpdateName?: (key: string, name: string) => Promise<void>;
+  onMove?: (key: string, targetFolder: string) => Promise<void>;
+  onDelete?: (key: string) => Promise<void>;
+  folders?: MediaFolder[];
+  currentFolder?: string;
+  copyFormat?: CopyLinkFormat;
+  onCreateFolder?: (
+    name: string,
+    parent: string,
+  ) => Promise<string | undefined>;
+  isCreatingFolder?: boolean;
+  startFolder?: string;
+  loadFolders?: (folder: string) => Promise<MediaFolder[]>;
+}
+
+export function MediaPreviewModal({
+  asset,
+  onClose,
+  onUpdateName,
+  onMove,
+  onDelete,
+  folders = [],
+  currentFolder = "",
+  copyFormat = "url",
+  onCreateFolder,
+  isCreatingFolder,
+  startFolder,
+  loadFolders,
+}: MediaPreviewModalProps) {
+  const isMounted = !!asset;
+  const shouldRender = useDelayUnmount(isMounted, 200);
+
+  // Persist asset during exit animation
+  const [activeAsset, setActiveAsset] = useState<MediaDirectoryFile | null>(
+    asset,
+  );
+
+  // Editing state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Move state
+  const [isMoving, setIsMoving] = useState(false);
+  const [targetFolder, setTargetFolder] = useState(currentFolder);
+
+  useEffect(() => {
+    if (asset) {
+      setActiveAsset(asset);
+      setEditName(asset.fileName);
+      setIsEditing(false);
+      setIsDeleting(false);
+      setTargetFolder(currentFolder);
+    }
+  }, [asset]);
+  const handleSaveName = async () => {
+    if (!activeAsset || !editName.trim() || !onUpdateName) return;
+
+    setIsSaving(true);
+    try {
+      await onUpdateName(activeAsset.key, editName);
+      setActiveAsset((prev) => (prev ? { ...prev, fileName: editName } : null));
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to update name:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!activeAsset || !onDelete) return;
+
+    // Safety check for linked posts handled by parent, but good to have visual feedback
+    if (linkedPosts.length > 0) {
+      toast.error(m.media_preview_delete_fail(), {
+        description: m.media_preview_delete_fail_desc(),
+      });
+      return;
+    }
+
+    if (!confirm(m.media_preview_delete_confirm())) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete(activeAsset.key);
+      onClose();
+    } catch (error) {
+      console.error("Delete failed:", error);
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!activeAsset) return;
+    try {
+      const absoluteUrl = activeAsset.url.startsWith("http")
+        ? activeAsset.url
+        : `${window.location.origin}${activeAsset.url}`;
+
+      await navigator.clipboard.writeText(
+        formatCopyLink(copyFormat, absoluteUrl, activeAsset.fileName),
+      );
+      toast.success(m.media_preview_copy_success(), {
+        description: m.media_preview_copy_success_desc(),
+      });
+    } catch (err) {
+      toast.error(m.media_preview_copy_fail(), {
+        description: m.media_preview_copy_fail_desc(),
+      });
+    }
+  };
+
+  const handleMove = async () => {
+    if (!activeAsset || !onMove) return;
+    setIsMoving(true);
+    try {
+      await onMove(activeAsset.key, targetFolder);
+      onClose();
+    } catch (error) {
+      console.error("Move failed:", error);
+    } finally {
+      setIsMoving(false);
+    }
+  };
+
+  // Query linked posts via server function
+  const { data: linkedPosts = [] } = useQuery({
+    queryKey: MEDIA_KEYS.linkedPosts(activeAsset?.key || ""),
+    queryFn: async () => {
+      if (!activeAsset?.key) return [];
+      return await getLinkedPostsFn({ data: { key: activeAsset.key } });
+    },
+    enabled: !!activeAsset?.key,
+  });
+
+  if (!shouldRender || !activeAsset) return null;
+
+  if (isFuwari) {
+    return (
+      <div
+        className={`fixed inset-0 z-100 flex items-center justify-center p-4 md:p-8 ${
+          isMounted ? "pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        {/* Backdrop */}
+        <div
+          className={`absolute inset-0 bg-black/30 backdrop-blur-sm dark:bg-black/40 transition-all duration-500 ${
+            isMounted ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={onClose}
+        />
+
+        {/* Close Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className={`absolute top-3 right-3 md:top-4 md:right-4 z-110 h-10 w-10 md:h-11 md:w-11 transition-all duration-500 ${
+            isMounted ? "opacity-100 scale-100" : "opacity-0 scale-90"
+          }`}
+        >
+          <X size={20} strokeWidth={1.5} />
+        </Button>
+
+        <div
+          className={`
+            w-full max-w-5xl h-full md:h-[85vh] flex flex-col md:flex-row
+            fuwari-card-base shadow-2xl relative overflow-hidden z-10
+            ${
+              isMounted
+                ? "animate-in fade-in zoom-in-95"
+                : "animate-out fade-out zoom-out-95"
+            } duration-500
+          `}
+        >
+          {/* --- Image Viewport (Left/Top) --- */}
+          <div className="h-[40vh] md:h-auto md:w-3/5 bg-(--fuwari-btn-regular-bg) relative flex items-center justify-center overflow-hidden p-8 md:p-12 border-b md:border-b-0 md:border-r border-(--fuwari-input-border)">
+            <img
+              src={activeAsset.url}
+              alt={activeAsset.fileName}
+              className="max-w-full max-h-full object-contain relative z-10 rounded-xl"
+            />
+          </div>
+
+          {/* --- Metadata Sidebar (Right/Bottom) --- */}
+          <div className="flex-1 md:w-2/5 flex flex-col min-h-0">
+            {/* Header */}
+            <div className="p-4 md:p-6 border-b border-(--fuwari-input-border)">
+              {isEditing ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="flex-1 h-9"
+                    autoFocus
+                  />
+                  <Button
+                    onClick={handleSaveName}
+                    disabled={isSaving}
+                    variant="default"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                  >
+                    {isSaving ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Check size={14} />
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => setIsEditing(false)}
+                    disabled={isSaving}
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-red-500"
+                  >
+                    <X size={14} />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex justify-between items-start gap-4 group/edit">
+                  <h2 className="text-lg sm:text-xl font-bold fuwari-text-90 break-all leading-snug">
+                    {activeAsset.fileName}
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsEditing(true)}
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-(--fuwari-primary)"
+                  >
+                    <Pencil size={14} />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Details List */}
+            <div className="flex-1 p-4 md:p-6 space-y-5 md:space-y-6 overflow-y-auto custom-scrollbar">
+              <div className="grid grid-cols-2 gap-y-5 gap-x-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm fuwari-text-50">
+                    <HardDrive size={12} /> {m.media_preview_size()}
+                  </div>
+                  <div className="text-sm sm:text-base fuwari-text-90 font-medium">
+                    {formatBytes(activeAsset.sizeInBytes)}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm fuwari-text-50">
+                    <FileText size={12} /> {m.media_preview_format()}
+                  </div>
+                  <div className="text-sm sm:text-base fuwari-text-90 font-medium">
+                    {activeAsset.mimeType.split("/")[1]}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm fuwari-text-50">
+                    <Layout size={12} /> {m.media_preview_dimensions()}
+                  </div>
+                  <div className="text-sm sm:text-base fuwari-text-90 font-medium">
+                    {activeAsset.width && activeAsset.height
+                      ? `${activeAsset.width} × ${activeAsset.height}`
+                      : m.media_grid_unknown_size()}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm fuwari-text-50">
+                    <Calendar size={12} /> {m.media_preview_created()}
+                  </div>
+                  <div className="text-sm sm:text-base fuwari-text-90 font-medium">
+                    {activeAsset.createdAt
+                      ? new Date(activeAsset.createdAt).toLocaleDateString()
+                      : m.media_grid_unknown_size()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Linked Posts Section */}
+              <div className="pt-5 border-t border-(--fuwari-input-border)">
+                <div className="flex items-center gap-2 text-xs sm:text-sm fuwari-text-50 mb-3">
+                  <Link2 size={12} />{" "}
+                  {m.media_preview_linked({ count: linkedPosts.length })}
+                </div>
+                {linkedPosts.length === 0 ? (
+                  <div className="text-sm fuwari-text-50 pl-4 border-l border-(--fuwari-input-border)">
+                    {m.media_preview_no_links()}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {linkedPosts.map((post) => (
+                      <Link
+                        key={post.id}
+                        to="/admin/posts/edit/$id"
+                        params={{ id: String(post.id) }}
+                        className="block p-3 rounded-xl bg-(--fuwari-input-bg) hover:bg-(--fuwari-btn-plain-bg-hover) border border-(--fuwari-input-border) hover:border-(--fuwari-primary)/50 transition-all group"
+                      >
+                        <div className="text-sm font-medium truncate mb-1 flex items-center justify-between fuwari-text-90">
+                          {post.title}
+                          <ExternalLink
+                            size={12}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity fuwari-text-30"
+                          />
+                        </div>
+                        <div className="text-xs fuwari-text-50">
+                          /{post.slug}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 pt-5 border-t border-(--fuwari-input-border)">
+                <div className="text-xs sm:text-sm fuwari-text-50">
+                  {m.media_preview_asset_key()}
+                </div>
+                <div className="p-3 rounded-xl bg-(--fuwari-input-bg) text-xs sm:text-sm font-mono fuwari-text-50 break-all leading-relaxed select-all border border-(--fuwari-input-border)">
+                  {activeAsset.key}
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 md:p-6 border-t border-(--fuwari-input-border) flex flex-col gap-3">
+              <div className="flex flex-col xl:flex-row gap-2">
+                <a
+                  href={`${activeAsset.url}?original=true`}
+                  download={activeAsset.fileName}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn(
+                    buttonVariants({ variant: "outline" }),
+                    "flex-1 h-10 gap-2 flex items-center justify-center whitespace-nowrap",
+                  )}
+                >
+                  <Download size={14} className="shrink-0" />
+                  {m.media_preview_btn_download()}
+                </a>
+
+                <Button
+                  variant="outline"
+                  onClick={handleCopyLink}
+                  className="flex-1 h-10 gap-2"
+                >
+                  <Copy size={14} className="shrink-0" />
+                  {m.media_preview_btn_copy()}
+                </Button>
+              </div>
+
+              {onMove && folders.length > 0 && (
+                <div className="flex gap-2">
+                  <div className="flex-1 min-w-0">
+                    <FolderDropdown
+                      value={targetFolder}
+                      folders={folders}
+                      labelPrefix={m.media_move_modal_target_label()}
+                      onChange={setTargetFolder}
+                      onCreateFolder={onCreateFolder}
+                      isCreatingFolder={isCreatingFolder}
+                      startFolder={startFolder}
+                      loadFolders={loadFolders}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleMove}
+                    disabled={isMoving || targetFolder === currentFolder}
+                    className="h-10 gap-2 shrink-0"
+                  >
+                    {isMoving ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <FolderInput size={14} />
+                    )}
+                    {m.media_move_btn()}
+                  </Button>
+                </div>
+              )}
+
+              {onDelete && (
+                <Button
+                  variant="ghost"
+                  onClick={handleDelete}
+                  disabled={isDeleting || linkedPosts.length > 0}
+                  className="w-full h-10 gap-2 text-red-500 hover:text-red-600"
+                >
+                  {isDeleting ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
+                  {m.media_preview_btn_delete()}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`fixed inset-0 z-100 flex items-center justify-center p-4 md:p-8 ${
+        isMounted ? "pointer-events-auto" : "opacity-0 pointer-events-none"
+      }`}
+    >
+      {/* Backdrop */}
+      <div
+        className={`absolute inset-0 bg-background/95 backdrop-blur-md transition-all duration-500 ${
+          isMounted ? "opacity-100" : "opacity-0"
+        }`}
+        onClick={onClose}
+      />
+
+      {/* Close Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onClose}
+        className={`absolute top-3 right-3 md:top-4 md:right-4 z-110 text-muted-foreground hover:text-foreground transition-all duration-500 rounded-none h-10 w-10 md:h-12 md:w-12 ${
+          isMounted ? "opacity-100 scale-100" : "opacity-0 scale-90"
+        }`}
+      >
+        <X size={24} strokeWidth={1} />
+      </Button>
+
+      <div
+        className={`
+        w-full max-w-6xl h-full md:h-[85vh] flex flex-col md:flex-row bg-background border border-border/30 shadow-none relative overflow-hidden z-10 rounded-none
+        ${
+          isMounted
+            ? "animate-in fade-in zoom-in-95"
+            : "animate-out fade-out zoom-out-95"
+        } duration-500
+      `}
+      >
+        {/* --- Image Viewport (Left/Top) --- */}
+        <div className="h-[40vh] md:h-auto md:w-2/3 bg-muted/5 relative flex items-center justify-center overflow-hidden p-8 md:p-12 border-b md:border-b-0 md:border-r border-border/30">
+          <div className="absolute top-4 left-4 text-xs font-mono text-muted-foreground uppercase tracking-widest z-20">
+            {m.media_preview_mode()}
+          </div>
+          <img
+            src={activeAsset.url}
+            alt={activeAsset.fileName}
+            className="max-w-full max-h-full object-contain relative z-10 shadow-sm"
+          />
+        </div>
+
+        {/* --- Metadata Sidebar (Right/Bottom) --- */}
+        <div className="flex-1 md:w-1/3 flex flex-col min-h-0 bg-background">
+          {/* Header */}
+          <div className="p-4 md:p-8 border-b border-border/30">
+            <div className="text-[10px] md:text-xs font-mono text-muted-foreground uppercase tracking-[0.3em] mb-3 md:mb-4">
+              {m.media_preview_details()}
+            </div>
+
+            {isEditing ? (
+              <div className="flex items-center gap-3">
+                <Input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="flex-1 h-9 text-base font-mono bg-muted/10 border-b border-border/50 rounded-none px-0 focus:border-foreground focus:ring-0"
+                  autoFocus
+                />
+                <Button
+                  onClick={handleSaveName}
+                  disabled={isSaving}
+                  variant="default"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 rounded-none"
+                >
+                  {isSaving ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Check size={14} />
+                  )}
+                </Button>
+                <Button
+                  onClick={() => setIsEditing(false)}
+                  disabled={isSaving}
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-red-500 rounded-none"
+                >
+                  <X size={14} />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex justify-between items-start gap-4 group/edit">
+                <h2 className="text-2xl font-serif font-medium tracking-tight break-all leading-snug">
+                  {activeAsset.fileName}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsEditing(true)}
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover/edit:opacity-100 rounded-none"
+                >
+                  <Pencil size={12} />
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Details List */}
+          <div className="flex-1 p-4 md:p-8 space-y-6 md:space-y-8 overflow-y-auto custom-scrollbar">
+            <div className="grid grid-cols-2 gap-y-6 gap-x-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground uppercase tracking-widest">
+                  <HardDrive size={10} /> {m.media_preview_size()}
+                </div>
+                <div className="text-sm font-mono font-medium">
+                  {formatBytes(activeAsset.sizeInBytes)}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground uppercase tracking-widest">
+                  <FileText size={10} /> {m.media_preview_format()}
+                </div>
+                <div className="text-sm font-mono font-medium uppercase">
+                  {activeAsset.mimeType.split("/")[1]}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground uppercase tracking-widest">
+                  <Layout size={10} /> {m.media_preview_dimensions()}
+                </div>
+                <div className="text-sm font-mono font-medium uppercase">
+                  {activeAsset.width && activeAsset.height
+                    ? `${activeAsset.width} × ${activeAsset.height}`
+                    : m.media_grid_unknown_size()}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground uppercase tracking-widest">
+                  <Calendar size={10} /> {m.media_preview_created()}
+                </div>
+                <div className="text-sm font-mono font-medium uppercase">
+                  {activeAsset.createdAt
+                    ? new Date(activeAsset.createdAt).toLocaleDateString()
+                    : m.media_grid_unknown_size()}
+                </div>
+              </div>
+            </div>
+
+            {/* Linked Posts Section */}
+            <div className="pt-6 border-t border-border/30">
+              <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground uppercase tracking-widest mb-4">
+                <Link2 size={10} />{" "}
+                {m.media_preview_linked({ count: linkedPosts.length })}
+              </div>
+              {linkedPosts.length === 0 ? (
+                <div className="text-xs font-mono text-muted-foreground uppercase tracking-wider pl-4 border-l border-border/30">
+                  {m.media_preview_no_links()}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {linkedPosts.map((post) => (
+                    <Link
+                      key={post.id}
+                      to="/admin/posts/edit/$id"
+                      params={{ id: String(post.id) }}
+                      className="block p-3 bg-muted/10 hover:bg-accent/10 border border-transparent hover:border-border/30 transition-all rounded-none group"
+                    >
+                      <div className="text-sm font-medium truncate mb-1 flex items-center justify-between">
+                        {post.title}
+                        <ExternalLink
+                          size={10}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        />
+                      </div>
+                      <div className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
+                        /{post.slug}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-6 border-t border-border/30">
+              <div className="text-xs font-mono text-muted-foreground uppercase tracking-widest">
+                {m.media_preview_asset_key()}
+              </div>
+              <div className="p-3 bg-muted/10 text-sm font-mono text-muted-foreground break-all rounded-none leading-relaxed select-all border border-border/30">
+                {activeAsset.key}
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="p-4 md:p-8 border-t border-border/30 bg-background flex flex-col gap-3">
+            <div className="flex flex-col xl:flex-row gap-3">
+              <a
+                href={`${activeAsset.url}?original=true`}
+                download={activeAsset.fileName}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "flex-1 h-10 text-xs uppercase tracking-widest font-medium hover:bg-foreground hover:text-background transition-all rounded-none gap-2 flex items-center justify-center whitespace-nowrap border-foreground/20",
+                )}
+              >
+                <Download size={12} className="shrink-0" />
+                <span>[ {m.media_preview_btn_download()} ]</span>
+              </a>
+
+              <Button
+                variant="outline"
+                onClick={handleCopyLink}
+                className="flex-1 h-10 text-xs uppercase tracking-widest font-medium hover:bg-foreground hover:text-background transition-all rounded-none gap-2 border-foreground/20"
+              >
+                <Copy size={12} className="shrink-0" />
+                <span>[ {m.media_preview_btn_copy()} ]</span>
+              </Button>
+            </div>
+
+            {onMove && folders.length > 0 && (
+              <div className="flex gap-3">
+                <div className="flex-1 min-w-0">
+                  <FolderDropdown
+                    value={targetFolder}
+                    folders={folders}
+                    labelPrefix={m.media_move_modal_target_label()}
+                    onChange={setTargetFolder}
+                    onCreateFolder={onCreateFolder}
+                    isCreatingFolder={isCreatingFolder}
+                    startFolder={startFolder}
+                    loadFolders={loadFolders}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleMove}
+                  disabled={isMoving || targetFolder === currentFolder}
+                  className="h-10 text-xs uppercase tracking-widest font-medium hover:bg-foreground hover:text-background transition-all rounded-none gap-2 border-foreground/20 shrink-0"
+                >
+                  {isMoving ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <FolderInput size={12} />
+                  )}
+                  <span>[ {m.media_move_btn()} ]</span>
+                </Button>
+              </div>
+            )}
+
+            {onDelete && (
+              <Button
+                variant="ghost"
+                onClick={handleDelete}
+                disabled={isDeleting || linkedPosts.length > 0}
+                className="w-full h-10 text-xs uppercase tracking-widest font-medium text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all rounded-none gap-2"
+              >
+                {isDeleting ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Trash2 size={12} />
+                )}
+                <span>[ {m.media_preview_btn_delete()} ]</span>
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,680 @@
+/* Theme: butterfly — Butterfly 设计令牌与工具类
+ * 取值来源：halo-theme-butterfly (hexo-theme-Index 移植版) 的
+ *   src/scss/core/_base.scss / main.scss / aside.scss
+ *   src/scss/modules/components.scss / page/index.scss
+ *   src/html/views/config.html (--theme / --card-*)
+ */
+@import "tailwindcss";
+@import "@/styles/shared.css";
+@import "./markdown.css";
+@plugin "@tailwindcss/typography";
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  :root {
+    /* ── Butterfly 结构令牌 ── */
+    --butterfly-page-width: 1250px;
+    --butterfly-banner-height: 500px;
+    --butterfly-aside-gap: 18px;
+    --butterfly-radius-large: 15px;
+    --butterfly-radius-small: 8px;
+    --butterfly-content-delay: 150ms;
+
+    /* 卡片：圆角 15px + 源主题阴影 */
+    --butterfly-card-shadow: 0 3px 8px 6px rgba(7, 17, 27, 0.05);
+    --butterfly-card-shadow-hover: 0 3px 8px 6px rgba(7, 17, 27, 0.09);
+    --butterfly-nav-shadow: 0 5px 6px -5px rgba(133, 133, 133, 0.6);
+
+    /* ── 浅色模式（--theme: #1c69ed, body: #f7f9fe）
+         主色 --butterfly-theme 可由主题设置覆盖，其余色值自动派生 ── */
+    --butterfly-theme: #1c69ed;
+    --butterfly-primary: var(--butterfly-theme);
+    --butterfly-primary-hover: color-mix(
+      in srgb,
+      var(--butterfly-theme) 86%,
+      #000000
+    );
+    --butterfly-primary-active: color-mix(
+      in srgb,
+      var(--butterfly-theme) 74%,
+      #000000
+    );
+    --butterfly-page-bg: #f7f9fe;
+    --butterfly-card-bg: #ffffff;
+    --butterfly-text-color: rgb(76, 73, 72);
+    --butterfly-btn-content: var(--butterfly-theme);
+    --butterfly-btn-regular-bg: color-mix(
+      in srgb,
+      var(--butterfly-theme) 8%,
+      transparent
+    );
+    --butterfly-btn-regular-bg-hover: color-mix(
+      in srgb,
+      var(--butterfly-theme) 15%,
+      transparent
+    );
+    --butterfly-btn-regular-bg-active: color-mix(
+      in srgb,
+      var(--butterfly-theme) 22%,
+      transparent
+    );
+    --butterfly-btn-plain-bg-hover: color-mix(
+      in srgb,
+      var(--butterfly-theme) 8%,
+      transparent
+    );
+    --butterfly-btn-plain-bg-active: color-mix(
+      in srgb,
+      var(--butterfly-theme) 14%,
+      transparent
+    );
+    --butterfly-enter-btn-bg: var(--butterfly-btn-regular-bg);
+    --butterfly-enter-btn-bg-hover: var(--butterfly-btn-regular-bg-hover);
+    --butterfly-enter-btn-bg-active: var(--butterfly-btn-regular-bg-active);
+    --butterfly-meta-divider: rgba(0, 0, 0, 0.2);
+    --butterfly-selection-bg: color-mix(
+      in srgb,
+      var(--butterfly-theme) 20%,
+      transparent
+    );
+    --butterfly-inline-code-bg: color-mix(
+      in srgb,
+      var(--butterfly-theme) 8%,
+      transparent
+    );
+    --butterfly-inline-code-color: var(--butterfly-theme);
+    --butterfly-input-bg: rgba(0, 0, 0, 0.04);
+    --butterfly-input-border: rgba(0, 0, 0, 0.1);
+    --butterfly-toc-btn-hover: color-mix(
+      in srgb,
+      var(--butterfly-theme) 8%,
+      transparent
+    );
+    --butterfly-toc-btn-active: color-mix(
+      in srgb,
+      var(--butterfly-theme) 14%,
+      transparent
+    );
+    --butterfly-code-bg: #f6f8fa;
+    --butterfly-border: rgba(0, 0, 0, 0.08);
+  }
+
+  .dark {
+    /* ── 暗色模式（body: rgb(15,23,42), card: rgb(40,47,62)） ── */
+    --butterfly-primary: color-mix(
+      in srgb,
+      var(--butterfly-theme) 70%,
+      #ffffff
+    );
+    --butterfly-primary-hover: color-mix(
+      in srgb,
+      var(--butterfly-theme) 55%,
+      #ffffff
+    );
+    --butterfly-primary-active: color-mix(
+      in srgb,
+      var(--butterfly-theme) 42%,
+      #ffffff
+    );
+    --butterfly-page-bg: rgb(15, 23, 42);
+    --butterfly-card-bg: rgb(40, 47, 62);
+    --butterfly-text-color: rgba(255, 255, 255, 0.7);
+    --butterfly-btn-content: color-mix(
+      in srgb,
+      var(--butterfly-theme) 60%,
+      #ffffff
+    );
+    --butterfly-btn-regular-bg: color-mix(
+      in srgb,
+      var(--butterfly-theme) 22%,
+      transparent
+    );
+    --butterfly-btn-regular-bg-hover: color-mix(
+      in srgb,
+      var(--butterfly-theme) 32%,
+      transparent
+    );
+    --butterfly-btn-regular-bg-active: color-mix(
+      in srgb,
+      var(--butterfly-theme) 42%,
+      transparent
+    );
+    --butterfly-btn-plain-bg-hover: rgba(255, 255, 255, 0.08);
+    --butterfly-btn-plain-bg-active: rgba(255, 255, 255, 0.14);
+    --butterfly-enter-btn-bg: var(--butterfly-btn-regular-bg);
+    --butterfly-enter-btn-bg-hover: var(--butterfly-btn-regular-bg-hover);
+    --butterfly-enter-btn-bg-active: var(--butterfly-btn-regular-bg-active);
+    --butterfly-meta-divider: rgba(255, 255, 255, 0.2);
+    --butterfly-selection-bg: color-mix(
+      in srgb,
+      var(--butterfly-theme) 35%,
+      transparent
+    );
+    --butterfly-inline-code-bg: rgba(255, 255, 255, 0.08);
+    --butterfly-inline-code-color: color-mix(
+      in srgb,
+      var(--butterfly-theme) 55%,
+      #ffffff
+    );
+    --butterfly-input-bg: rgba(255, 255, 255, 0.06);
+    --butterfly-input-border: rgba(255, 255, 255, 0.12);
+    --butterfly-toc-btn-hover: rgba(255, 255, 255, 0.08);
+    --butterfly-toc-btn-active: rgba(255, 255, 255, 0.14);
+    --butterfly-code-bg: rgba(0, 0, 0, 0.28);
+    --butterfly-border: rgba(255, 255, 255, 0.12);
+    --butterfly-card-shadow: 0 3px 8px 6px rgba(0, 0, 0, 0.18);
+    --butterfly-card-shadow-hover: 0 3px 8px 6px rgba(0, 0, 0, 0.28);
+    --butterfly-nav-shadow: 0 5px 6px -5px rgba(0, 0, 0, 0.6);
+  }
+
+  /* ── 语义化变量：映射到 Butterfly 令牌，
+       供后台管理页与通用 UI 组件沿用同一套视觉 ── */
+  :root {
+    --background: var(--butterfly-page-bg);
+    --foreground: var(--butterfly-text-color);
+
+    --muted: rgba(0, 0, 0, 0.05);
+    --muted-foreground: rgba(76, 73, 72, 0.65);
+
+    --popover: var(--butterfly-card-bg);
+    --popover-foreground: var(--butterfly-text-color);
+
+    --border: var(--butterfly-border);
+    --input: var(--butterfly-input-bg);
+
+    --primary: var(--butterfly-primary);
+    --primary-foreground: #ffffff;
+
+    --secondary: var(--butterfly-btn-regular-bg);
+    --secondary-foreground: var(--butterfly-btn-content);
+
+    --accent: var(--butterfly-btn-regular-bg);
+    --accent-foreground: var(--butterfly-btn-content);
+
+    --ring: var(--butterfly-primary);
+
+    --destructive: #e5484d;
+    --destructive-foreground: #ffffff;
+
+    --warning: #f5a524;
+    --warning-foreground: #1f2937;
+
+    --info: #1c69ed;
+    --info-foreground: #ffffff;
+
+    --selection: var(--butterfly-primary);
+    --selection-foreground: #ffffff;
+  }
+
+  .dark {
+    --background: var(--butterfly-page-bg);
+    --foreground: var(--butterfly-text-color);
+
+    --muted: rgba(255, 255, 255, 0.06);
+    --muted-foreground: rgba(255, 255, 255, 0.6);
+
+    --popover: var(--butterfly-card-bg);
+    --popover-foreground: var(--butterfly-text-color);
+
+    --border: var(--butterfly-border);
+    --input: var(--butterfly-input-bg);
+
+    --primary: var(--butterfly-primary);
+    --primary-foreground: #0b1220;
+
+    --secondary: var(--butterfly-btn-regular-bg);
+    --secondary-foreground: var(--butterfly-btn-content);
+
+    --accent: var(--butterfly-btn-regular-bg);
+    --accent-foreground: var(--butterfly-btn-content);
+
+    --ring: var(--butterfly-primary);
+
+    --destructive: #ff6369;
+    --destructive-foreground: #ffffff;
+
+    --warning: #f5a524;
+    --warning-foreground: #1f2937;
+
+    --info: #4d8bf5;
+    --info-foreground: #0b1220;
+
+    --selection: var(--butterfly-primary);
+    --selection-foreground: #0b1220;
+  }
+
+  body {
+    font-family:
+      "Butterfly Font", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+      Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei",
+      sans-serif;
+    color: var(--butterfly-text-color);
+    background-color: var(--butterfly-page-bg);
+  }
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
+}
+
+@layer components {
+  /* Butterfly 卡片：白底 + 15px 圆角 + 淡阴影 */
+  .butterfly-card-base {
+    border-radius: var(--butterfly-radius-large);
+    overflow: hidden;
+    background-color: var(--butterfly-card-bg);
+    box-shadow: var(--butterfly-card-shadow);
+    transition:
+      background-color 0.3s,
+      box-shadow 0.25s,
+      color 0.3s;
+  }
+
+  .butterfly-card-base.butterfly-card-hover:hover {
+    box-shadow: var(--butterfly-card-shadow-hover);
+  }
+
+  /* Butterfly 文章列表：list / tile 两种排布 */
+  .butterfly-essay-item {
+    display: flex;
+    position: relative;
+    overflow: hidden;
+    background-color: var(--butterfly-card-bg);
+    border-radius: var(--butterfly-radius-large);
+    box-shadow: var(--butterfly-card-shadow);
+    transition:
+      box-shadow 0.25s,
+      transform 0.25s;
+  }
+
+  .butterfly-essay-item:hover {
+    box-shadow: var(--butterfly-card-shadow-hover);
+  }
+
+  .butterfly-essay-item-list {
+    height: 16rem;
+  }
+
+  .butterfly-essay-cover {
+    position: relative;
+    overflow: hidden;
+    flex: 0 0 40%;
+  }
+
+  .butterfly-essay-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+  }
+
+  .butterfly-essay-item:hover .butterfly-essay-cover img {
+    transform: scale(1.06);
+  }
+
+  /* 置顶徽标：右上角红色渐变圆角标 */
+  .butterfly-pin-badge {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    z-index: 20;
+    padding: 0 8px;
+    border-radius: 0 50px 50px 0;
+    background: linear-gradient(135deg, #fd7a64 10%, #fb2d2d 100%);
+    color: #fff;
+    font-size: 0.8em;
+    line-height: 2;
+  }
+
+  .butterfly-btn-regular {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--butterfly-btn-regular-bg);
+    color: var(--butterfly-btn-content);
+    transition:
+      background-color 0.2s,
+      color 0.2s;
+  }
+  .butterfly-btn-regular:hover {
+    background-color: var(--butterfly-btn-regular-bg-hover);
+  }
+  .butterfly-btn-regular:active {
+    background-color: var(--butterfly-btn-regular-bg-active);
+  }
+
+  .butterfly-btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--butterfly-primary);
+    color: #ffffff;
+    transition:
+      background-color 0.2s,
+      color 0.2s,
+      opacity 0.2s;
+  }
+  .butterfly-btn-primary:hover {
+    background-color: var(--butterfly-primary-hover);
+  }
+  .butterfly-btn-primary:active {
+    background-color: var(--butterfly-primary-active);
+  }
+  .butterfly-btn-primary:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .dark .butterfly-btn-primary {
+    color: #0b1220;
+  }
+
+  .butterfly-text-90 {
+    color: color-mix(in srgb, var(--butterfly-text-color) 92%, transparent);
+  }
+
+  .butterfly-text-75 {
+    color: color-mix(in srgb, var(--butterfly-text-color) 78%, transparent);
+  }
+
+  .butterfly-text-70 {
+    color: color-mix(in srgb, var(--butterfly-text-color) 72%, transparent);
+  }
+
+  .butterfly-text-50 {
+    color: color-mix(in srgb, var(--butterfly-text-color) 58%, transparent);
+  }
+
+  .butterfly-text-40 {
+    color: color-mix(in srgb, var(--butterfly-text-color) 48%, transparent);
+  }
+
+  .butterfly-text-30 {
+    color: color-mix(in srgb, var(--butterfly-text-color) 38%, transparent);
+  }
+
+  .butterfly-meta-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--butterfly-btn-regular-bg);
+    color: var(--butterfly-btn-content);
+    margin-right: 0.5rem;
+    transition:
+      background-color 0.2s,
+      color 0.2s;
+  }
+
+  .butterfly-expand-animation {
+    position: relative;
+    z-index: 0;
+  }
+  .butterfly-expand-animation::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    scale: 0.85;
+    z-index: -1;
+    transition:
+      scale 0.2s ease-out,
+      background-color 0.2s;
+  }
+  .butterfly-expand-animation:hover::before {
+    scale: 1;
+    background-color: var(--butterfly-btn-plain-bg-hover);
+  }
+  .butterfly-expand-animation:active::before {
+    background-color: var(--butterfly-btn-plain-bg-active);
+  }
+
+  .butterfly-timeline-dash {
+    position: relative;
+  }
+  .butterfly-timeline-dash::before {
+    content: "";
+    position: absolute;
+    width: 10%;
+    height: 100%;
+    left: calc(50% - 1px);
+    border-left: 2px dashed var(--butterfly-border);
+    pointer-events: none;
+    transition: all 0.3s;
+    transform: translateY(-50%);
+  }
+
+  .butterfly-code-folding-wrapper {
+    @apply relative transition-[max-height] duration-500 ease-in-out overflow-x-auto overflow-y-hidden;
+  }
+
+  .butterfly-code-mask {
+    @apply absolute bottom-0 left-0 right-0 h-24 pointer-events-none;
+    background: linear-gradient(to bottom, transparent, var(--butterfly-code-bg));
+    z-index: 10;
+  }
+
+  .butterfly-toc-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--butterfly-input-border) transparent;
+  }
+  .butterfly-toc-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .butterfly-toc-scrollbar::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+  .butterfly-toc-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--butterfly-input-border);
+    border-radius: 4px;
+    border: none;
+  }
+}
+
+/* Butterfly onload / entrance animations */
+@keyframes butterfly-fade-in-up {
+  0% {
+    transform: translateY(2rem);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.butterfly-onload-animation {
+  opacity: 0;
+  animation: 300ms butterfly-fade-in-up ease-out forwards;
+}
+
+::selection {
+  background-color: var(--butterfly-selection-bg);
+  color: inherit;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--butterfly-primary);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  transition: all 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--butterfly-primary-hover);
+  border-width: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Butterfly admin backend — native visual system (.butterfly-admin)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.butterfly-admin {
+  background-color: var(--butterfly-page-bg);
+  color: var(--butterfly-text-color);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --fa-radius-md: 0.75rem;
+}
+
+.butterfly-admin {
+  --border: var(--butterfly-input-border);
+  --muted: var(--butterfly-btn-regular-bg);
+  --muted-foreground: rgba(76, 73, 72, 0.65);
+}
+.dark .butterfly-admin {
+  --border: rgba(255, 255, 255, 0.14);
+  --muted: rgba(255, 255, 255, 0.06);
+  --muted-foreground: rgba(255, 255, 255, 0.6);
+}
+
+.butterfly-admin :is(.font-serif, .font-mono) {
+  font-family: inherit;
+}
+.butterfly-admin :is(.text-[9px], .text-[10px], .text-[11px]) {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.butterfly-admin .uppercase {
+  text-transform: none;
+}
+.butterfly-admin .tracking-widest,
+.butterfly-admin .tracking-wider {
+  letter-spacing: 0.01em;
+}
+.butterfly-admin
+  :is(
+    .border-border,
+    .border-border\/20,
+    .border-border\/25,
+    .border-border\/30,
+    .border-border\/40,
+    .border-border\/50
+  ) {
+  border-color: var(--butterfly-input-border);
+}
+.butterfly-admin
+  :is(
+    .bg-muted\/5,
+    .bg-muted\/10,
+    .bg-muted\/20,
+    .bg-accent\/5,
+    .bg-accent\/10,
+    .bg-secondary\/10,
+    .bg-background\/50,
+    .bg-background\/60,
+    .bg-background\/70,
+    .bg-background\/90,
+    .bg-background\/95,
+    .bg-background\/96
+  ) {
+  background-color: var(--butterfly-card-bg);
+}
+.butterfly-admin
+  :is(
+    .text-muted-foreground\/40,
+    .text-muted-foreground\/50,
+    .text-muted-foreground\/60,
+    .text-muted-foreground\/70,
+    .text-muted-foreground\/80
+  ) {
+  color: rgba(76, 73, 72, 0.65);
+}
+.dark
+  .butterfly-admin
+  :is(
+    .text-muted-foreground\/40,
+    .text-muted-foreground\/50,
+    .text-muted-foreground\/60,
+    .text-muted-foreground\/70,
+    .text-muted-foreground\/80
+  ) {
+  color: rgba(255, 255, 255, 0.6);
+}
+.butterfly-admin button.bg-muted {
+  background-color: var(--butterfly-btn-regular-bg);
+}
+.butterfly-admin tr:hover,
+.butterfly-admin [role="row"]:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--butterfly-primary) 3%,
+    var(--butterfly-card-bg)
+  );
+}
+.butterfly-admin :is(input, textarea, select) {
+  border-radius: var(--fa-radius-md);
+}
+.butterfly-admin .border-foreground {
+  border-color: var(--butterfly-primary);
+}
+
+body:has(.butterfly-admin) div:not(.admin-layout).relative.bg-background.border,
+body:has(.butterfly-admin) aside.relative.bg-background {
+  border-radius: var(--butterfly-radius-large);
+  background-color: var(--butterfly-card-bg);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 4px 24px rgb(0 0 0 / 0.1);
+}
+body:has(.butterfly-admin) :is(.font-serif, .font-mono) {
+  font-family: inherit;
+}
+body:has(.butterfly-admin) :is(.text-[9px], .text-[10px], .text-[11px]) {
+  font-size: 13px;
+}
+body:has(.butterfly-admin) .uppercase {
+  text-transform: none;
+}
+body:has(.butterfly-admin) :is(.tracking-widest, .tracking-wider) {
+  letter-spacing: 0.01em;
+}
+body:has(.butterfly-admin) .bg-foreground {
+  background-color: var(--butterfly-primary);
+}
+body:has(.butterfly-admin) .bg-foreground.text-background {
+  color: #fff;
+}
+.dark body:has(.butterfly-admin) .bg-foreground.text-background {
+  color: rgb(0 0 0 / 0.78);
+}

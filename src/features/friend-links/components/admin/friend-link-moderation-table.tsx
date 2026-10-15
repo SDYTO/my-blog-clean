@@ -1,0 +1,1518 @@
+import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
+import {
+  Check,
+  ExternalLink,
+  Link2Off,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  ShieldAlert,
+  X,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { AdminPagination } from "@/components/admin/admin-pagination";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import ConfirmationModal from "@/components/ui/confirmation-modal";
+import { Input } from "@/components/ui/input";
+import type { FriendLinkStatus } from "@/lib/db/schema";
+import { isFuwari } from "@/lib/theme-mode";
+import { formatDate } from "@/lib/utils";
+import { m } from "@/paraglide/messages";
+import type { CreateFriendLinkInput } from "../../friend-links.schema";
+import { createCreateFriendLinkSchema } from "../../friend-links.schema";
+import { useAdminFriendLinks } from "../../hooks/use-friend-links";
+import { allFriendLinksQuery, FRIEND_LINKS_KEYS } from "../../queries";
+
+interface FriendLinkModerationTableProps {
+  status?: FriendLinkStatus;
+  page?: number;
+}
+
+const PAGE_SIZE = 20;
+const routeApi = getRouteApi("/admin/friend-links/");
+
+export const FriendLinkModerationTable = ({
+  status,
+  page = 1,
+}: FriendLinkModerationTableProps) => {
+  const navigate = routeApi.useNavigate();
+  const {
+    data: response,
+    isLoading,
+    isError,
+  } = useQuery(
+    allFriendLinksQuery({
+      status,
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+    }),
+  );
+
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const { approveAsync, rejectAsync } = useAdminFriendLinks();
+  const queryClient = useQueryClient();
+
+  const handleSelectAll = () => {
+    if (!response) return;
+    if (selectedIds.size === response.items.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(response.items.map((item) => item.id)));
+    }
+  };
+
+  const handleSelectOne = (id: number) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleBatchApprove = async () => {
+    if (selectedIds.size === 0) return;
+    const toastId = toast.loading(
+      m.friend_links_batch_approve_loading({ count: selectedIds.size }),
+    );
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map((id) => approveAsync({ data: { id } })),
+      );
+      toast.success(m.friend_links_batch_approve_success(), { id: toastId });
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: FRIEND_LINKS_KEYS.all });
+    } catch (caughtError) {
+      toast.error(m.friend_links_batch_partial_fail(), {
+        id: toastId,
+      });
+    }
+  };
+
+  const handleBatchReject = async () => {
+    if (selectedIds.size === 0) return;
+    const toastId = toast.loading(
+      m.friend_links_batch_reject_loading({ count: selectedIds.size }),
+    );
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map((id) => rejectAsync({ data: { id } })),
+      );
+      toast.success(m.friend_links_batch_reject_success(), { id: toastId });
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: FRIEND_LINKS_KEYS.all });
+    } catch (caughtError) {
+      toast.error(m.friend_links_batch_partial_fail(), {
+        id: toastId,
+      });
+    }
+  };
+
+  if (isFuwari) {
+    return (
+      <FuwariFriendLinkModerationTable
+        isLoading={isLoading}
+        isError={isError}
+        response={response}
+        selectedIds={selectedIds}
+        setSelectedIds={setSelectedIds}
+        handleSelectAll={handleSelectAll}
+        handleSelectOne={handleSelectOne}
+        handleBatchApprove={handleBatchApprove}
+        handleBatchReject={handleBatchReject}
+        page={page}
+      />
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="py-24 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center text-muted-foreground font-serif italic gap-4 border-t border-border">
+        <ShieldAlert size={40} strokeWidth={1} className="opacity-30" />
+        <p>{m.friend_links_admin_load_fail()}</p>
+      </div>
+    );
+  }
+
+  if (!response || response.items.length === 0) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center text-muted-foreground font-serif italic gap-4 border-t border-border">
+        <Link2Off size={40} strokeWidth={1} className="opacity-20" />
+        <p>{m.friend_links_empty()}</p>
+      </div>
+    );
+  }
+
+  const allSelected =
+    response.items.length > 0 && selectedIds.size === response.items.length;
+  const totalPages = Math.ceil(response.total / PAGE_SIZE);
+
+  return (
+    <div className="space-y-6">
+      {/* Batch Actions Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-4 z-40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-background border border-border/30 shadow-none animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-6">
+            <span className="text-[10px] font-mono font-medium uppercase tracking-[0.2em]">
+              {m.friend_links_batch_selected({ count: selectedIds.size })}
+            </span>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+            >
+              [ {m.friend_links_batch_cancel()} ]
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              onClick={handleBatchApprove}
+              className="h-8 px-4 rounded-none bg-foreground text-background hover:bg-foreground/90 transition-all font-mono text-[10px] uppercase tracking-widest"
+            >
+              [ {m.friend_links_batch_approve()} ]
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBatchReject}
+              className="h-8 px-4 rounded-none border-border/50 hover:bg-red-500/10 hover:text-red-500 transition-all font-mono text-[10px] uppercase tracking-widest"
+            >
+              [ {m.friend_links_batch_reject()} ]
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* List Header (Desktop) */}
+      <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 border-b border-border/30 items-center bg-muted/5">
+        <div className="col-span-1 flex justify-center">
+          <Checkbox
+            checked={allSelected}
+            onCheckedChange={handleSelectAll}
+            className="rounded-none border-border/50 data-[state=checked]:bg-foreground data-[state=checked]:text-background"
+          />
+        </div>
+        <div className="col-span-2 text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+          {m.friend_links_th_submitter()}
+        </div>
+        <div className="col-span-3 text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+          {m.friend_links_th_site_info()}
+        </div>
+        <div className="col-span-3 text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+          {m.friend_links_th_details()}
+        </div>
+        <div className="col-span-1 text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+          {m.friend_links_th_status()}
+        </div>
+        <div className="col-span-2 text-right text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+          {m.friend_links_th_actions()}
+        </div>
+      </div>
+
+      {/* Items List */}
+      <div className="divide-y divide-border/30">
+        {response.items.map((item) => (
+          <div
+            key={item.id}
+            className={`
+              group transition-all duration-500
+              ${selectedIds.has(item.id) ? "bg-muted/30" : "hover:bg-muted/10"}
+            `}
+          >
+            {/* Desktop Item */}
+            <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-6 items-start hover:bg-accent/5 transition-colors">
+              <div className="col-span-1 flex justify-center pt-1">
+                <Checkbox
+                  checked={selectedIds.has(item.id)}
+                  onCheckedChange={() => handleSelectOne(item.id)}
+                  className="rounded-none border-border/50 data-[state=checked]:bg-foreground data-[state=checked]:text-background"
+                />
+              </div>
+
+              {/* Submitter Info */}
+              <div className="col-span-2 space-y-3">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="w-8 h-8 rounded-none bg-muted/20 flex items-center justify-center border border-border/30 shrink-0">
+                    {item.user?.image ? (
+                      <img
+                        src={item.user.image}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-[10px] font-mono">
+                        {item.user?.name.slice(0, 1) || "A"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="text-xs font-serif font-medium truncate">
+                      {item.user?.name || m.friend_links_admin_added()}
+                    </div>
+                    <div className="text-[9px] font-mono text-muted-foreground uppercase tracking-widest">
+                      {formatDate(item.createdAt).split(" ")[0]}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Site Info */}
+              <div className="col-span-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  {item.logoUrl && (
+                    <img
+                      src={item.logoUrl}
+                      className="w-5 h-5 rounded-sm object-cover shrink-0"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  )}
+                  <span className="text-sm font-serif font-medium truncate">
+                    {item.siteName}
+                  </span>
+                </div>
+                <a
+                  href={item.siteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 truncate"
+                >
+                  <ExternalLink size={10} className="shrink-0" />
+                  <span className="truncate">{item.siteUrl}</span>
+                </a>
+              </div>
+
+              {/* Details */}
+              <div className="col-span-3 space-y-2">
+                {item.description && (
+                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                    {item.description}
+                  </p>
+                )}
+                {item.contactEmail && (
+                  <div className="text-[10px] font-mono text-muted-foreground">
+                    {item.contactEmail}
+                  </div>
+                )}
+                {item.rejectionReason && (
+                  <div className="text-[10px] font-mono text-orange-500 flex items-center gap-1">
+                    <span>
+                      {m.friend_links_reject_reason_prefix({
+                        reason: item.rejectionReason,
+                      })}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Status */}
+              <div className="col-span-1 pt-1">
+                <StatusBadge status={item.status} />
+              </div>
+
+              {/* Actions */}
+              <div className="col-span-2 flex justify-end">
+                <FriendLinkActions
+                  friendLinkId={item.id}
+                  status={item.status}
+                  friendLink={item}
+                />
+              </div>
+            </div>
+
+            {/* Mobile Item */}
+            <div className="md:hidden p-6 space-y-4">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-4">
+                  <Checkbox
+                    checked={selectedIds.has(item.id)}
+                    onCheckedChange={() => handleSelectOne(item.id)}
+                    className="rounded-none border-border"
+                  />
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-none bg-muted flex items-center justify-center border border-border shrink-0">
+                      {item.user?.image ? (
+                        <img
+                          src={item.user.image}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-[10px] font-mono">
+                          {item.user?.name.slice(0, 1) || "A"}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold font-serif tracking-tight">
+                        {item.user?.name || m.friend_links_admin_added()}
+                      </div>
+                      <div className="text-[9px] font-mono text-muted-foreground uppercase">
+                        {formatDate(item.createdAt).split(" ")[0]}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <StatusBadge status={item.status} />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  {item.logoUrl && (
+                    <img
+                      src={item.logoUrl}
+                      className="w-5 h-5 rounded-sm object-cover shrink-0"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  )}
+                  <span className="text-sm font-serif font-medium">
+                    {item.siteName}
+                  </span>
+                </div>
+                <a
+                  href={item.siteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 truncate"
+                >
+                  <ExternalLink size={10} className="shrink-0" />
+                  <span className="truncate">{item.siteUrl}</span>
+                </a>
+              </div>
+
+              <div className="flex flex-col gap-2 text-[10px] font-mono text-muted-foreground bg-muted/20 p-3">
+                {item.description && <div>{item.description}</div>}
+                {item.contactEmail && <div>{item.contactEmail}</div>}
+                {item.rejectionReason && (
+                  <div className="text-orange-500">
+                    {m.friend_links_reject_reason_prefix({
+                      reason: item.rejectionReason,
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-border/30">
+                <FriendLinkActions
+                  friendLinkId={item.id}
+                  status={item.status}
+                  friendLink={item}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      <div className="pt-12 px-2 border-t border-border/30">
+        <AdminPagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={response.total}
+          itemsPerPage={PAGE_SIZE}
+          currentPageItemCount={response.items.length}
+          onPageChange={(newPage) =>
+            navigate({
+              search: ((prev: Record<string, unknown>) => ({
+                ...prev,
+                page: newPage,
+              })) as never,
+            })
+          }
+        />
+      </div>
+    </div>
+  );
+};
+
+// ============ Sub-components ============
+
+const StatusBadge = ({ status }: { status: string }) => {
+  const labels: Record<string, string> = {
+    approved: m.friend_links_tab_approved(),
+    pending: m.friend_links_tab_pending(),
+    rejected: m.friend_links_tab_rejected(),
+  };
+
+  const styles: Record<string, string> = {
+    approved: "text-foreground",
+    pending: "text-amber-500",
+    rejected: "text-muted-foreground",
+  };
+
+  return (
+    <div
+      className={`font-mono text-[9px] uppercase tracking-widest ${styles[status] || ""}`}
+    >
+      [{labels[status] || status}]
+    </div>
+  );
+};
+
+interface FriendLinkActionsProps {
+  friendLinkId: number;
+  status: string;
+  friendLink: {
+    siteName: string;
+    siteUrl: string;
+    description?: string | null;
+    logoUrl?: string | null;
+    contactEmail?: string | null;
+  };
+}
+
+const FriendLinkActions = ({
+  friendLinkId,
+  status,
+  friendLink,
+}: FriendLinkActionsProps) => {
+  const {
+    approve,
+    reject,
+    update,
+    adminDelete,
+    isApproving,
+    isRejecting,
+    isUpdating,
+    isAdminDeleting,
+  } = useAdminFriendLinks();
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleApprove = () => {
+    setIsOpen(false);
+    approve({ data: { id: friendLinkId } });
+  };
+
+  const confirmDelete = () => {
+    adminDelete(
+      { data: { id: friendLinkId } },
+      { onSuccess: () => setShowDeleteConfirm(false) },
+    );
+  };
+
+  const isLoading = isApproving || isRejecting || isUpdating || isAdminDeleting;
+
+  if (isFuwari) {
+    return (
+      <>
+        <div className="flex items-center justify-end relative" ref={menuRef}>
+          <button
+            className="fuwari-btn-regular rounded-lg h-9 w-9 active:scale-90 hover:text-(--fuwari-primary) transition-colors disabled:opacity-40"
+            disabled={isLoading}
+            onClick={() => setIsOpen(!isOpen)}
+            title={m.friend_links_action_btn()}
+            aria-label={m.friend_links_action_btn()}
+          >
+            {isLoading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <MoreHorizontal size={16} strokeWidth={1.5} />
+            )}
+          </button>
+
+          {isOpen && (
+            <div className="absolute right-0 top-full mt-2 w-52 fuwari-card-base p-1.5 z-50 shadow-lg animate-in fade-in zoom-in-95 duration-200">
+              <div className="space-y-0.5">
+                {status !== "approved" && (
+                  <button
+                    onClick={handleApprove}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm fuwari-text-75 text-left hover:bg-(--fuwari-btn-regular-bg) hover:text-(--fuwari-primary) transition-colors"
+                  >
+                    <span>{m.friend_links_action_approve()}</span>
+                    <Check className="h-3.5 w-3.5 fuwari-text-30 shrink-0" />
+                  </button>
+                )}
+
+                {status !== "rejected" && (
+                  <button
+                    onClick={() => {
+                      setIsOpen(false);
+                      setShowRejectModal(true);
+                    }}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm fuwari-text-75 text-left hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                  >
+                    <span>{m.friend_links_action_reject()}</span>
+                    <X className="h-3.5 w-3.5 fuwari-text-30 shrink-0" />
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    setShowEditModal(true);
+                  }}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm fuwari-text-75 text-left hover:bg-(--fuwari-btn-regular-bg) hover:text-(--fuwari-primary) transition-colors"
+                >
+                  <span>{m.friend_links_action_edit()}</span>
+                  <Pencil className="h-3.5 w-3.5 fuwari-text-30 shrink-0" />
+                </button>
+              </div>
+
+              <div className="h-px bg-(--fuwari-input-border) my-1.5" />
+
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  setShowDeleteConfirm(true);
+                }}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm text-left text-red-500 hover:bg-red-500/10 transition-colors"
+              >
+                <span>{m.friend_links_action_destroy()}</span>
+                <ShieldAlert className="h-3.5 w-3.5 fuwari-text-30 shrink-0" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <ConfirmationModal
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={confirmDelete}
+          title={m.friend_links_destroy_modal_title()}
+          message={m.friend_links_destroy_modal_desc()}
+          confirmLabel={m.friend_links_destroy_modal_confirm()}
+          isDanger={true}
+          isLoading={isAdminDeleting}
+        />
+
+        <RejectModal
+          isOpen={showRejectModal}
+          onClose={() => setShowRejectModal(false)}
+          onConfirm={(reason) => {
+            reject(
+              { data: { id: friendLinkId, rejectionReason: reason } },
+              { onSuccess: () => setShowRejectModal(false) },
+            );
+          }}
+          isLoading={isRejecting}
+        />
+
+        <EditModal
+          key={friendLinkId}
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          onConfirm={(data) => {
+            update(
+              { data: { id: friendLinkId, ...data } },
+              { onSuccess: () => setShowEditModal(false) },
+            );
+          }}
+          isLoading={isUpdating}
+          initialData={friendLink}
+        />
+      </>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-end relative" ref={menuRef}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 w-auto px-2 text-[10px] font-mono text-muted-foreground hover:text-foreground rounded-none gap-1"
+        disabled={isLoading}
+        onClick={() => setIsOpen(!isOpen)}
+        title={m.friend_links_action_btn()}
+      >
+        {isLoading ? (
+          <Loader2 size={12} className="animate-spin" />
+        ) : (
+          <span>[ {m.friend_links_action_btn()} ]</span>
+        )}
+      </Button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-2 w-48 bg-background border border-border/30 z-50 p-1 animate-in fade-in zoom-in-95 duration-200">
+          <div className="space-y-0.5">
+            {status !== "approved" && (
+              <button
+                onClick={handleApprove}
+                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-mono text-left hover:bg-muted/10 transition-colors text-foreground group"
+              >
+                <span>{m.friend_links_action_approve()}</span>
+                <Check className="h-3 w-3 opacity-0 group-hover:opacity-100" />
+              </button>
+            )}
+
+            {status !== "rejected" && (
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  setShowRejectModal(true);
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-mono text-left hover:bg-muted/10 transition-colors text-muted-foreground hover:text-red-500 group"
+              >
+                <span>{m.friend_links_action_reject()}</span>
+                <X className="h-3 w-3 opacity-0 group-hover:opacity-100" />
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                setShowEditModal(true);
+              }}
+              className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-mono text-left hover:bg-muted/10 transition-colors text-foreground group"
+            >
+              <span>{m.friend_links_action_edit()}</span>
+              <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100" />
+            </button>
+          </div>
+
+          <div className="h-px bg-border/30 my-1" />
+
+          <button
+            onClick={() => {
+              setIsOpen(false);
+              setShowDeleteConfirm(true);
+            }}
+            className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-mono text-left hover:bg-red-500/10 text-red-500 transition-colors group"
+          >
+            <span>{m.friend_links_action_destroy()}</span>
+            <ShieldAlert className="h-3 w-3 opacity-0 group-hover:opacity-100" />
+          </button>
+        </div>
+      )}
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title={m.friend_links_destroy_modal_title()}
+        message={m.friend_links_destroy_modal_desc()}
+        confirmLabel={m.friend_links_destroy_modal_confirm()}
+        isDanger={true}
+        isLoading={isAdminDeleting}
+      />
+
+      <RejectModal
+        isOpen={showRejectModal}
+        onClose={() => setShowRejectModal(false)}
+        onConfirm={(reason) => {
+          reject(
+            { data: { id: friendLinkId, rejectionReason: reason } },
+            { onSuccess: () => setShowRejectModal(false) },
+          );
+        }}
+        isLoading={isRejecting}
+      />
+
+      <EditModal
+        key={friendLinkId}
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onConfirm={(data) => {
+          update(
+            { data: { id: friendLinkId, ...data } },
+            { onSuccess: () => setShowEditModal(false) },
+          );
+        }}
+        isLoading={isUpdating}
+        initialData={friendLink}
+      />
+    </div>
+  );
+};
+
+// ============ Reject Modal ============
+
+const RejectModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  isLoading,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (reason?: string) => void;
+  isLoading: boolean;
+}) => {
+  const [reason, setReason] = useState("");
+
+  if (!isOpen) return null;
+
+  if (isFuwari) {
+    return (
+      <div className="fixed inset-0 z-100 flex items-center justify-center p-4 md:p-6 transition-all duration-300">
+        <div
+          className="absolute inset-0 bg-black/30 backdrop-blur-sm dark:bg-black/50"
+          onClick={onClose}
+        />
+        <div className="relative w-full max-w-md fuwari-card-base p-5 sm:p-6 flex flex-col">
+          <div className="flex items-start justify-between gap-4 pb-4 border-b border-(--fuwari-input-border)">
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] fuwari-text-30">
+                [ {m.friend_links_admin_tag()} ]
+              </p>
+              <h3 className="text-xl font-bold fuwari-text-90">
+                {m.friend_links_reject_modal_title()}
+              </h3>
+            </div>
+            <button
+              onClick={onClose}
+              className="shrink-0 p-1 -mr-1 -mt-1 fuwari-text-50 hover:text-(--fuwari-primary) transition-colors"
+              aria-label={m.common_close()}
+            >
+              <X size={20} strokeWidth={1.5} />
+            </button>
+          </div>
+
+          <div className="py-5 space-y-4">
+            <label className="block text-sm font-bold fuwari-text-75">
+              {m.friend_links_reject_modal_label()}
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full bg-(--fuwari-input-bg) border border-(--fuwari-input-border) rounded-xl px-3 py-2.5 text-sm fuwari-text-75 placeholder:fuwari-text-30 focus:outline-none focus:ring-2 focus:ring-(--fuwari-primary)/30 transition-all resize-none"
+              rows={3}
+              placeholder={m.friend_links_reject_modal_placeholder()}
+              maxLength={500}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-5 border-t border-(--fuwari-input-border)">
+            <button
+              onClick={onClose}
+              className="fuwari-btn-regular rounded-xl h-10 px-4 text-sm font-medium fuwari-text-75 hover:text-(--fuwari-primary) active:scale-95 transition-all"
+            >
+              {m.friend_links_batch_cancel()}
+            </button>
+            <Button
+              onClick={() => onConfirm(reason || undefined)}
+              disabled={isLoading}
+              className="h-10 px-5 text-sm font-bold active:scale-95 transition-all"
+            >
+              {isLoading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                m.friend_links_reject_modal_confirm()
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative bg-background border border-border/30 p-8 max-w-md w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
+        <h3 className="text-lg font-serif font-medium mb-6">
+          {m.friend_links_reject_modal_title()}
+        </h3>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+              {m.friend_links_reject_modal_label()}
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full bg-transparent border border-border/50 px-3 py-2 text-sm font-sans focus:border-foreground focus:outline-none transition-colors resize-none"
+              rows={3}
+              placeholder={m.friend_links_reject_modal_placeholder()}
+              maxLength={500}
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              className="font-mono text-[10px] uppercase tracking-widest rounded-none"
+            >
+              {m.friend_links_batch_cancel()}
+            </Button>
+            <Button
+              onClick={() => onConfirm(reason || undefined)}
+              disabled={isLoading}
+              className="rounded-none bg-foreground text-background hover:bg-foreground/90 font-mono text-[10px] uppercase tracking-widest"
+            >
+              {isLoading ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                m.friend_links_reject_modal_confirm()
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============ Edit Modal ============
+
+const EditModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  isLoading,
+  initialData,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (data: {
+    siteName?: string;
+    siteUrl?: string;
+    description?: string;
+    logoUrl?: string;
+    contactEmail?: string;
+  }) => void;
+  isLoading: boolean;
+  initialData: {
+    siteName: string;
+    siteUrl: string;
+    description?: string | null;
+    logoUrl?: string | null;
+    contactEmail?: string | null;
+  };
+}) => {
+  const form = useForm<CreateFriendLinkInput>({
+    resolver: standardSchemaResolver(createCreateFriendLinkSchema(m)),
+    defaultValues: {
+      siteName: initialData.siteName,
+      siteUrl: initialData.siteUrl,
+      description: initialData.description || "",
+      logoUrl: initialData.logoUrl || "",
+      contactEmail: initialData.contactEmail || "",
+    },
+  });
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = form;
+
+  const [siteName, siteUrl] = watch(["siteName", "siteUrl"]);
+
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  const handleConfirm = (data: CreateFriendLinkInput) => {
+    onConfirm({
+      siteName: data.siteName,
+      siteUrl: data.siteUrl,
+      description: data.description || undefined,
+      logoUrl: data.logoUrl || undefined,
+      contactEmail: data.contactEmail || undefined,
+    });
+  };
+
+  if (!isOpen) return null;
+
+  if (isFuwari) {
+    return (
+      <div className="fixed inset-0 z-100 flex items-center justify-center p-4 md:p-6 transition-all duration-300">
+        <div
+          className="absolute inset-0 bg-black/30 backdrop-blur-sm dark:bg-black/50"
+          onClick={handleClose}
+        />
+        <div className="relative w-full max-w-md fuwari-card-base p-5 sm:p-6 flex flex-col">
+          <div className="flex items-start justify-between gap-4 pb-4 border-b border-(--fuwari-input-border)">
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] fuwari-text-30">
+                [ {m.friend_links_admin_tag()} ]
+              </p>
+              <h3 className="text-xl font-bold fuwari-text-90">
+                {m.friend_links_edit_modal_title()}
+              </h3>
+            </div>
+            <button
+              onClick={handleClose}
+              className="shrink-0 p-1 -mr-1 -mt-1 fuwari-text-50 hover:text-(--fuwari-primary) transition-colors"
+              aria-label={m.common_close()}
+            >
+              <X size={20} strokeWidth={1.5} />
+            </button>
+          </div>
+
+          <form
+            onSubmit={handleSubmit(handleConfirm)}
+            className="py-5 space-y-5"
+          >
+            <FuwariFormField
+              label={m.friend_links_form_site_name()}
+              error={errors.siteName?.message}
+              inputProps={register("siteName")}
+            />
+            <FuwariFormField
+              label={m.friend_links_form_site_url()}
+              error={errors.siteUrl?.message}
+              inputProps={register("siteUrl")}
+            />
+            <FuwariFormField
+              label={m.friend_links_form_desc()}
+              error={errors.description?.message}
+              inputProps={register("description")}
+            />
+            <FuwariFormField
+              label={m.friend_links_form_logo()}
+              error={errors.logoUrl?.message}
+              inputProps={register("logoUrl")}
+            />
+            <FuwariFormField
+              label={m.friend_links_form_email()}
+              error={errors.contactEmail?.message}
+              inputProps={register("contactEmail")}
+            />
+          </form>
+
+          <div className="flex justify-end gap-2.5 pt-5 border-t border-(--fuwari-input-border)">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="fuwari-btn-regular rounded-xl h-10 px-4 text-sm font-medium fuwari-text-75 hover:text-(--fuwari-primary) active:scale-95 transition-all"
+            >
+              {m.friend_links_batch_cancel()}
+            </button>
+            <Button
+              type="submit"
+              onClick={handleSubmit(handleConfirm)}
+              disabled={isLoading || !siteName.trim() || !siteUrl.trim()}
+              className="h-10 px-5 text-sm font-bold active:scale-95 transition-all"
+            >
+              {isLoading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                m.friend_links_edit_modal_save()
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+        onClick={handleClose}
+      />
+      <div className="relative bg-background border border-border/30 p-8 max-w-md w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
+        <h3 className="text-lg font-serif font-medium mb-6">
+          {m.friend_links_edit_modal_title()}
+        </h3>
+        <form onSubmit={handleSubmit(handleConfirm)} className="space-y-4">
+          <FormField
+            label={m.friend_links_form_site_name()}
+            error={errors.siteName?.message}
+            inputProps={register("siteName")}
+          />
+          <FormField
+            label={m.friend_links_form_site_url()}
+            error={errors.siteUrl?.message}
+            inputProps={register("siteUrl")}
+          />
+          <FormField
+            label={m.friend_links_form_desc()}
+            error={errors.description?.message}
+            inputProps={register("description")}
+          />
+          <FormField
+            label={m.friend_links_form_logo()}
+            error={errors.logoUrl?.message}
+            inputProps={register("logoUrl")}
+          />
+          <FormField
+            label={m.friend_links_form_email()}
+            error={errors.contactEmail?.message}
+            inputProps={register("contactEmail")}
+          />
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleClose}
+              className="font-mono text-[10px] uppercase tracking-widest rounded-none"
+            >
+              {m.friend_links_batch_cancel()}
+            </Button>
+            <Button
+              type="submit"
+              disabled={isLoading || !siteName.trim() || !siteUrl.trim()}
+              className="rounded-none bg-foreground text-background hover:bg-foreground/90 font-mono text-[10px] uppercase tracking-widest"
+            >
+              {isLoading ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                m.friend_links_edit_modal_save()
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const FormField = ({
+  label,
+  error,
+  inputProps,
+}: {
+  label: string;
+  error?: string;
+  inputProps: React.ComponentProps<typeof Input>;
+}) => (
+  <div className="space-y-1.5">
+    <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+      {label}
+    </label>
+    <Input
+      {...inputProps}
+      className="bg-transparent border-0 border-b border-border/50 text-sm px-0 rounded-none focus-visible:ring-0 focus-visible:border-foreground transition-all shadow-none h-auto py-1.5"
+    />
+    {error && <p className="text-xs text-red-500">! {error}</p>}
+  </div>
+);
+
+const FuwariFormField = ({
+  label,
+  error,
+  inputProps,
+}: {
+  label: string;
+  error?: string;
+  inputProps: React.ComponentProps<typeof Input>;
+}) => {
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-bold fuwari-text-75">{label}</label>
+      <Input {...inputProps} />
+      {error && <p className="text-xs text-red-500 font-medium">! {error}</p>}
+    </div>
+  );
+};
+
+const FuwariStatusBadge = ({ status }: { status: FriendLinkStatus }) => {
+  const labels: Record<FriendLinkStatus, string> = {
+    approved: m.friend_links_tab_approved(),
+    pending: m.friend_links_tab_pending(),
+    rejected: m.friend_links_tab_rejected(),
+  };
+
+  const styles: Record<FriendLinkStatus, string> = {
+    approved: "bg-(--fuwari-primary)/10 text-(--fuwari-primary)",
+    pending: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    rejected: "bg-(--fuwari-btn-regular-bg) fuwari-text-50",
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-bold ${styles[status]}`}
+    >
+      {labels[status]}
+    </span>
+  );
+};
+
+interface FuwariFriendLinkModerationTableProps {
+  isLoading: boolean;
+  isError: boolean;
+  response: FuwariFriendLinksResponse | undefined;
+  selectedIds: Set<number>;
+  setSelectedIds: (s: Set<number>) => void;
+  handleSelectAll: () => void;
+  handleSelectOne: (id: number) => void;
+  handleBatchApprove: () => Promise<void>;
+  handleBatchReject: () => Promise<void>;
+  page: number;
+}
+
+type FuwariFriendLinkItem = {
+  id: number;
+  status: FriendLinkStatus;
+  createdAt: string | Date;
+  user?: { name?: string | null; image?: string | null } | null;
+  siteName: string;
+  siteUrl: string;
+  logoUrl?: string | null;
+  description?: string | null;
+  contactEmail?: string | null;
+  rejectionReason?: string | null;
+};
+
+type FuwariFriendLinksResponse = {
+  items: FuwariFriendLinkItem[];
+  total: number;
+};
+
+function FuwariFriendLinkModerationTable({
+  isLoading,
+  isError,
+  response,
+  selectedIds,
+  setSelectedIds,
+  handleSelectAll,
+  handleSelectOne,
+  handleBatchApprove,
+  handleBatchReject,
+  page,
+}: FuwariFriendLinkModerationTableProps) {
+  const navigate = routeApi.useNavigate();
+
+  if (isLoading) {
+    return (
+      <div className="fuwari-card-base p-16 flex items-center justify-center">
+        <Loader2 size={22} className="animate-spin fuwari-text-50" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="fuwari-card-base p-16 flex flex-col items-center justify-center gap-4">
+        <ShieldAlert size={36} strokeWidth={1} className="fuwari-text-30" />
+        <p className="text-sm fuwari-text-50">
+          {m.friend_links_admin_load_fail()}
+        </p>
+      </div>
+    );
+  }
+
+  if (!response || response.items.length === 0) {
+    return (
+      <div className="fuwari-card-base p-16 flex flex-col items-center justify-center gap-4">
+        <Link2Off size={36} strokeWidth={1} className="fuwari-text-30" />
+        <p className="text-sm fuwari-text-50">{m.friend_links_empty()}</p>
+      </div>
+    );
+  }
+
+  const allSelected =
+    response.items.length > 0 && selectedIds.size === response.items.length;
+  const totalPages = Math.ceil(response.total / PAGE_SIZE);
+
+  return (
+    <div className="space-y-6 fuwari-onload-animation">
+      {/* Batch Actions Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="fuwari-card-base p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-6">
+            <span className="text-sm font-bold fuwari-text-75">
+              {m.friend_links_batch_selected({ count: selectedIds.size })}
+            </span>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-xs fuwari-text-50 hover:text-(--fuwari-primary) transition-colors"
+            >
+              {m.friend_links_batch_cancel()}
+            </button>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <Button
+              size="sm"
+              onClick={handleBatchApprove}
+              className="h-9 px-4 rounded-xl text-sm font-bold active:scale-95 transition-all flex items-center gap-1.5"
+            >
+              <Check size={14} strokeWidth={2} />
+              {m.friend_links_batch_approve()}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBatchReject}
+              className="h-9 px-4 rounded-xl text-sm font-medium text-red-500 bg-red-500/5 border-red-500/20 hover:bg-red-500/10 hover:text-red-500 active:scale-95 transition-all flex items-center gap-1.5"
+            >
+              <X size={14} strokeWidth={1.5} />
+              {m.friend_links_batch_reject()}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Table Card */}
+      <div className="fuwari-card-base p-4 sm:p-5 md:p-6">
+        {/* List Header (Desktop) */}
+        <div className="hidden md:grid grid-cols-12 gap-4 px-1 py-3 items-center border-b border-(--fuwari-input-border)">
+          <div className="col-span-1 flex justify-center">
+            <Checkbox checked={allSelected} onCheckedChange={handleSelectAll} />
+          </div>
+          <div className="col-span-2 text-xs fuwari-text-50 font-bold">
+            {m.friend_links_th_submitter()}
+          </div>
+          <div className="col-span-3 text-xs fuwari-text-50 font-bold">
+            {m.friend_links_th_site_info()}
+          </div>
+          <div className="col-span-3 text-xs fuwari-text-50 font-bold">
+            {m.friend_links_th_details()}
+          </div>
+          <div className="col-span-1 text-xs fuwari-text-50 font-bold">
+            {m.friend_links_th_status()}
+          </div>
+          <div className="col-span-2 text-right text-xs fuwari-text-50 font-bold">
+            {m.friend_links_th_actions()}
+          </div>
+        </div>
+
+        {/* Items List */}
+        <div className="divide-y divide-(--fuwari-input-border)">
+          {response.items.map((item) => (
+            <div
+              key={item.id}
+              className={`transition-colors ${
+                selectedIds.has(item.id)
+                  ? "bg-(--fuwari-primary)/5"
+                  : "hover:bg-(--fuwari-btn-regular-bg)"
+              }`}
+            >
+              {/* Desktop Item */}
+              <div className="hidden md:grid grid-cols-12 gap-4 px-1 py-5 items-start">
+                <div className="col-span-1 flex justify-center pt-1">
+                  <Checkbox
+                    checked={selectedIds.has(item.id)}
+                    onCheckedChange={() => handleSelectOne(item.id)}
+                  />
+                </div>
+
+                {/* Submitter Info */}
+                <div className="col-span-2 space-y-3">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="w-9 h-9 rounded-xl bg-(--fuwari-btn-regular-bg) flex items-center justify-center overflow-hidden shrink-0">
+                      {item.user?.image ? (
+                        <img
+                          src={item.user.image}
+                          className="w-full h-full object-cover"
+                          alt={item.user?.name || ""}
+                        />
+                      ) : (
+                        <span className="text-xs font-bold fuwari-text-50">
+                          {item.user?.name?.slice(0, 1) || "A"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="text-sm font-bold fuwari-text-90 truncate">
+                        {item.user?.name || m.friend_links_admin_added()}
+                      </div>
+                      <div className="text-xs fuwari-text-30">
+                        {formatDate(item.createdAt).split(" ")[0]}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Site Info */}
+                <div className="col-span-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    {item.logoUrl && (
+                      <img
+                        src={item.logoUrl}
+                        className="w-5 h-5 rounded-md object-cover shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    )}
+                    <span className="text-sm font-bold fuwari-text-90 truncate">
+                      {item.siteName}
+                    </span>
+                  </div>
+                  <a
+                    href={item.siteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs fuwari-text-50 hover:text-(--fuwari-primary) transition-colors flex items-center gap-1 truncate"
+                  >
+                    <ExternalLink
+                      size={12}
+                      strokeWidth={1.5}
+                      className="shrink-0"
+                    />
+                    <span className="truncate">{item.siteUrl}</span>
+                  </a>
+                </div>
+
+                {/* Details */}
+                <div className="col-span-3 space-y-2">
+                  {item.description && (
+                    <p className="text-sm fuwari-text-50 leading-relaxed line-clamp-2">
+                      {item.description}
+                    </p>
+                  )}
+                  {item.contactEmail && (
+                    <div className="text-xs fuwari-text-30">
+                      {item.contactEmail}
+                    </div>
+                  )}
+                  {item.rejectionReason && (
+                    <div className="text-xs text-orange-600 dark:text-orange-400 bg-orange-500/5 px-2.5 py-1.5 rounded-lg flex items-center gap-2 w-fit">
+                      <ShieldAlert size={12} strokeWidth={1.5} />
+                      <span>
+                        {m.friend_links_reject_reason_prefix({
+                          reason: item.rejectionReason,
+                        })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status */}
+                <div className="col-span-1 pt-1">
+                  <FuwariStatusBadge status={item.status} />
+                </div>
+
+                {/* Actions */}
+                <div className="col-span-2 flex justify-end">
+                  <FriendLinkActions
+                    friendLinkId={item.id}
+                    status={item.status}
+                    friendLink={item}
+                  />
+                </div>
+              </div>
+
+              {/* Mobile Item */}
+              <div className="md:hidden p-4 space-y-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-4">
+                    <Checkbox
+                      checked={selectedIds.has(item.id)}
+                      onCheckedChange={() => handleSelectOne(item.id)}
+                    />
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-(--fuwari-btn-regular-bg) flex items-center justify-center overflow-hidden shrink-0">
+                        {item.user?.image ? (
+                          <img
+                            src={item.user.image}
+                            className="w-full h-full object-cover"
+                            alt={item.user?.name || ""}
+                          />
+                        ) : (
+                          <span className="text-xs font-bold fuwari-text-50">
+                            {item.user?.name?.slice(0, 1) || "A"}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold fuwari-text-90">
+                          {item.user?.name || m.friend_links_admin_added()}
+                        </div>
+                        <div className="text-xs fuwari-text-30">
+                          {formatDate(item.createdAt).split(" ")[0]}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <FuwariStatusBadge status={item.status} />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    {item.logoUrl && (
+                      <img
+                        src={item.logoUrl}
+                        className="w-5 h-5 rounded-md object-cover shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    )}
+                    <span className="text-sm font-bold fuwari-text-90">
+                      {item.siteName}
+                    </span>
+                  </div>
+                  <a
+                    href={item.siteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs fuwari-text-50 hover:text-(--fuwari-primary) transition-colors flex items-center gap-1 truncate"
+                  >
+                    <ExternalLink
+                      size={12}
+                      strokeWidth={1.5}
+                      className="shrink-0"
+                    />
+                    <span className="truncate">{item.siteUrl}</span>
+                  </a>
+                </div>
+
+                <div className="flex flex-col gap-2 text-sm fuwari-text-50 bg-(--fuwari-btn-regular-bg)/40 p-3 rounded-lg">
+                  {item.description && <div>{item.description}</div>}
+                  {item.contactEmail && (
+                    <div className="text-xs">{item.contactEmail}</div>
+                  )}
+                  {item.rejectionReason && (
+                    <div className="text-xs text-orange-600 dark:text-orange-400">
+                      {m.friend_links_reject_reason_prefix({
+                        reason: item.rejectionReason,
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-3 border-t border-(--fuwari-input-border)">
+                  <FriendLinkActions
+                    friendLinkId={item.id}
+                    status={item.status}
+                    friendLink={item}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Pagination */}
+      <div className="px-1">
+        <AdminPagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={response.total}
+          itemsPerPage={PAGE_SIZE}
+          currentPageItemCount={response.items.length}
+          onPageChange={(newPage) =>
+            navigate({
+              search: ((prev: Record<string, unknown>) => ({
+                ...prev,
+                page: newPage,
+              })) as never,
+            })
+          }
+        />
+      </div>
+    </div>
+  );
+}

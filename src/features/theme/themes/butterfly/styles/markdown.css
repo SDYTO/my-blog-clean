@@ -1,0 +1,342 @@
+@reference "tailwindcss";
+
+.butterfly-custom-md {
+  --tw-prose-body: rgb(0 0 0 / 0.9);
+  --tw-prose-headings: rgb(0 0 0 / 0.9);
+  --tw-prose-lead: rgb(0 0 0 / 0.75);
+  --tw-prose-links: var(--butterfly-primary);
+  --tw-prose-bold: rgb(0 0 0 / 0.9);
+  --tw-prose-counters: rgb(0 0 0 / 0.5);
+  --tw-prose-bullets: rgb(0 0 0 / 0.3);
+  --tw-prose-hr: var(--butterfly-meta-divider);
+  --tw-prose-quotes: rgb(0 0 0 / 0.75);
+  --tw-prose-quote-borders: var(--butterfly-btn-regular-bg);
+  --tw-prose-captions: rgb(0 0 0 / 0.5);
+  --tw-prose-code: var(--butterfly-inline-code-color);
+  --tw-prose-pre-code: var(--butterfly-btn-content);
+  --tw-prose-pre-bg: var(--butterfly-card-bg);
+  --tw-prose-th-borders: rgb(0 0 0 / 0.35);
+  --tw-prose-td-borders: rgb(0 0 0 / 0.35);
+
+  color: var(--tw-prose-body);
+  overflow-wrap: break-word;
+  overflow-x: clip;
+  min-width: 0;
+  max-width: 100%;
+
+  img,
+  video,
+  iframe,
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  h1 {
+    @apply text-3xl font-bold font-sans tracking-normal mt-10 mb-6;
+  }
+
+  h2 {
+    @apply text-2xl font-bold font-sans tracking-normal mt-10 mb-5;
+  }
+
+  h3 {
+    @apply text-xl font-bold font-sans tracking-normal mt-8 mb-4;
+  }
+
+  h4 {
+    @apply text-lg font-bold font-sans tracking-normal mt-6 mb-3;
+  }
+
+  h5,
+  h6 {
+    @apply text-base font-bold font-sans tracking-normal mt-6 mb-3;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    &:hover::after {
+      content: "#";
+      @apply text-(--butterfly-primary) opacity-50 transition-opacity font-normal no-underline ml-[0.2ch];
+    }
+    .anchor {
+      @apply transition -m-0.5 ml-[0.2ch] p-0.5 select-none opacity-0! no-underline!;
+
+      .anchor-icon {
+        @apply mx-[0.45ch]!;
+      }
+    }
+
+    &:hover {
+      .anchor {
+        @apply opacity-100!;
+      }
+    }
+  }
+
+  a:not(.no-styling) {
+    @apply relative bg-none font-medium text-(--butterfly-primary) underline decoration-(--butterfly-link-underline) decoration-1 decoration-dashed underline-offset-4;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+
+    &:hover,
+    &:active {
+      @apply decoration-transparent;
+      background: var(--butterfly-btn-plain-bg-hover);
+      border-bottom: 1px dashed var(--butterfly-primary-hover);
+      text-decoration: none;
+    }
+  }
+
+  :not(pre) > code {
+    @apply bg-(--butterfly-inline-code-bg) text-(--butterfly-inline-code-color) px-1 py-0.5 rounded-md;
+    overflow-wrap: anywhere;
+  }
+
+  code {
+    font-family:
+      "JetBrains Mono Variable",
+      ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Consolas,
+      Liberation Mono,
+      Courier New,
+      monospace;
+    &:before {
+      content: none;
+    }
+    &:after {
+      content: none;
+    }
+
+    counter-reset: line;
+    span.line {
+      &:before {
+        @apply text-black/30 mr-4 w-4 inline-block;
+        content: counter(line);
+        counter-increment: line;
+        direction: rtl;
+      }
+      &:last-child:empty,
+      &:last-child:has(> span:empty:only-child) {
+        display: none;
+      }
+    }
+  }
+
+  .expressive-code {
+    @apply my-4;
+    ::selection {
+      @apply bg-(--butterfly-codeblock-selection);
+      color: inherit;
+    }
+  }
+
+  ul,
+  ol {
+    li::marker {
+      @apply text-(--butterfly-primary);
+    }
+  }
+
+  ul[data-type="taskList"],
+  ul.task-list {
+    @apply list-none p-0;
+
+    li {
+      @apply flex items-start gap-2 pl-0 marker:content-none;
+
+      > label {
+        @apply mt-1 shrink-0 cursor-pointer select-none flex items-center;
+        input[type="checkbox"] {
+          @apply h-4 w-4 shrink-0 cursor-pointer appearance-none rounded-sm border-2 border-(--butterfly-meta-divider) bg-transparent transition-colors duration-200;
+          &:checked {
+            @apply border-(--butterfly-primary) bg-(--butterfly-primary);
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M5 13l4 4L19 7'/%3e%3c/svg%3e");
+            background-size: 10px;
+            background-position: center;
+            background-repeat: no-repeat;
+          }
+        }
+        span {
+          display: none;
+        }
+      }
+
+      > div {
+        @apply min-w-0;
+        p {
+          @apply my-0;
+        }
+      }
+    }
+  }
+
+  ul.contains-task-list {
+    @apply list-none p-0;
+
+    li.task-list-item {
+      @apply flex items-start gap-2 pl-0 marker:content-none;
+
+      input[type="checkbox"] {
+        @apply mt-1.5 h-4 w-4 shrink-0 cursor-pointer appearance-none rounded-sm border-2 border-(--butterfly-meta-divider) bg-transparent transition-colors duration-200;
+        &:checked {
+          @apply border-(--butterfly-primary) bg-(--butterfly-primary);
+          background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M5 13l4 4L19 7'/%3e%3c/svg%3e");
+          background-size: 10px;
+          background-position: center;
+          background-repeat: no-repeat;
+        }
+      }
+    }
+  }
+
+  blockquote {
+    @apply not-italic border-transparent relative;
+    font-weight: inherit;
+
+    &:before {
+      @apply content-[''] absolute -left-1 block transition bg-(--butterfly-btn-regular-bg) h-full w-1 rounded-full;
+    }
+
+    /* Remove the double quotes from default styles */
+    p:before,
+    p:after {
+      @apply content-none;
+    }
+  }
+
+  /* KaTeX / Mathematics */
+  .tiptap-mathematics-render,
+  .katex {
+    font-size: 1.1em;
+    color: var(--tw-prose-body);
+  }
+  .tiptap-mathematics-render[data-type="block-math"],
+  .katex-display {
+    margin: 1.5em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-align: center;
+  }
+
+  /* 内联 HTML 标签：kbd / sub / sup / mark */
+  kbd {
+    @apply bg-(--butterfly-inline-code-bg) text-(--butterfly-inline-code-color) px-1.5 py-0.5 rounded-md border border-(--butterfly-meta-divider) font-mono text-[0.85em] leading-none align-middle;
+    overflow-wrap: anywhere;
+  }
+
+  sub,
+  sup {
+    line-height: 0;
+  }
+
+  mark {
+    @apply rounded-md px-1 py-0.5;
+    background: color-mix(in srgb, var(--butterfly-primary) 22%, transparent);
+    color: inherit;
+  }
+
+  /* 折叠块等原始 HTML 块 */
+  details {
+    @apply my-4 rounded-lg border border-(--butterfly-meta-divider) bg-(--butterfly-card-bg);
+
+    > summary {
+      @apply px-4 py-2.5 cursor-pointer select-none font-medium;
+    }
+
+    &[open] > summary {
+      @apply border-b border-(--butterfly-meta-divider);
+    }
+
+    > *:not(summary) {
+      @apply mx-4 my-3;
+    }
+  }
+
+  .html-block-content {
+    @apply my-4 first:mt-0 last:mb-0;
+  }
+
+  /* 表格：与编辑器预览一致的边框 + 单元格自动换行 */
+  table {
+    @apply w-full my-4 border-collapse text-left;
+    table-layout: auto;
+  }
+
+  th,
+  td {
+    @apply border border-(--butterfly-meta-divider) px-3 py-2 align-top;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  th {
+    @apply font-medium;
+    background-color: color-mix(in srgb, var(--butterfly-primary) 10%, transparent);
+  }
+
+  /* 脚注区块（preprocessExtendedMarkdown 生成） */
+  .footnotes {
+    @apply mt-10 text-sm;
+    color: var(--tw-prose-captions);
+
+    hr {
+      @apply my-4;
+      border-color: var(--tw-prose-hr);
+    }
+
+    ol {
+      @apply my-0 ml-5 list-decimal space-y-1.5;
+    }
+
+    .footnote-backref {
+      @apply no-underline ml-1;
+      &:hover {
+        color: var(--butterfly-primary);
+      }
+    }
+  }
+
+  sup.footnote-ref a,
+  sup a[href^="#fn-"] {
+    @apply no-underline;
+    color: var(--tw-prose-captions);
+    &:hover {
+      color: var(--butterfly-primary);
+    }
+  }
+}
+
+:is(.dark .butterfly-custom-md) {
+  --tw-prose-body: rgb(255 255 255 / 0.9);
+  --tw-prose-headings: rgb(255 255 255 / 0.9);
+  --tw-prose-lead: rgb(255 255 255 / 0.75);
+  --tw-prose-links: var(--butterfly-primary);
+  --tw-prose-bold: rgb(255 255 255 / 0.9);
+  --tw-prose-counters: rgb(255 255 255 / 0.5);
+  --tw-prose-bullets: rgb(255 255 255 / 0.3);
+  --tw-prose-hr: var(--butterfly-meta-divider);
+  --tw-prose-quotes: rgb(255 255 255 / 0.75);
+  --tw-prose-quote-borders: var(--butterfly-btn-regular-bg);
+  --tw-prose-captions: rgb(255 255 255 / 0.5);
+  --tw-prose-code: var(--butterfly-inline-code-color);
+  --tw-prose-pre-code: var(--butterfly-btn-content);
+  --tw-prose-pre-bg: var(--butterfly-card-bg);
+  --tw-prose-th-borders: rgb(255 255 255 / 0.3);
+  --tw-prose-td-borders: rgb(255 255 255 / 0.3);
+}
+
+:is(.dark .butterfly-custom-md) code span.line:before {
+  @apply text-white/30;
+}

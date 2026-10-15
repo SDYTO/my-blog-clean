@@ -1,0 +1,245 @@
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { Link, useRouterState } from "@tanstack/react-router";
+import type { JSONContent } from "@tiptap/react";
+import { LogIn } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useComments } from "@/features/comments/hooks/use-comments";
+import {
+  type CommentTargetInput,
+  rootCommentsByTargetInfiniteQuery,
+} from "@/features/comments/queries";
+import { authClient } from "@/lib/auth/auth.client";
+import { m } from "@/paraglide/messages";
+import { VhastroCommentEditor } from "../editor/comment-editor";
+import { VhastroCommentList } from "./comment-list";
+import VhastroConfirmationModal from "./confirmation-modal";
+
+interface VhastroCommentSectionProps {
+  postId?: number;
+  momentId?: number;
+  aboutArticleId?: number;
+}
+
+export function VhastroCommentSection({
+  postId,
+  momentId,
+  aboutArticleId,
+}: VhastroCommentSectionProps) {
+  const { data: session } = authClient.useSession();
+  const target: CommentTargetInput =
+    aboutArticleId != null
+      ? { aboutArticleId }
+      : momentId != null
+        ? { momentId }
+        : { postId };
+  const { rootId, highlightCommentId } = useRouterState({
+    select: (state) =>
+      (state.location.search as {
+        rootId?: number;
+        highlightCommentId?: number;
+      }) ?? {},
+  });
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      ...rootCommentsByTargetInfiniteQuery(target, session?.user.id),
+      enabled: !!session,
+    });
+
+  const rootComments = data?.pages.flatMap((page) => page.items) ?? [];
+  const totalCount = data?.pages[0]?.total ?? 0;
+
+  const { createComment, deleteComment, isCreating, isDeleting } =
+    useComments(target);
+
+  const [replyTarget, setReplyTarget] = useState<{
+    rootId: number;
+    commentId: number;
+    userName: string;
+  } | null>(null);
+
+  const [commentToDelete, setCommentToDelete] = useState<number | null>(null);
+
+  const handleCreateComment = async (
+    content: JSONContent,
+  ): Promise<boolean> => {
+    const result = await createComment({
+      data: {
+        ...target,
+        content,
+      },
+    });
+    // 返回成功与否：编辑器仅在成功时清空内容，失败保留以便重试
+    return !result?.error;
+  };
+
+  const handleCreateReply = async (
+    content: JSONContent,
+  ): Promise<boolean> => {
+    if (!replyTarget) return false;
+    const result = await createComment({
+      data: {
+        ...target,
+        content,
+        rootId: replyTarget.rootId,
+        replyToCommentId: replyTarget.commentId,
+      },
+    });
+    if (!result?.error) {
+      setReplyTarget(null);
+    }
+    return !result?.error;
+  };
+
+  const handleDelete = async () => {
+    if (commentToDelete) {
+      await deleteComment({ data: { id: commentToDelete } });
+      setCommentToDelete(null);
+    }
+  };
+
+  /* Anchor Navigation for CSR */
+  useEffect(() => {
+    if (isLoading || !data) return;
+
+    const handleAnchor = () => {
+      const hash = window.location.hash;
+      if (!hash || !hash.startsWith("#comment-")) return;
+
+      const commentId = parseInt(hash.replace("#comment-", ""), 10);
+      if (isNaN(commentId)) return;
+
+      let retries = 0;
+      const maxRetries = 20;
+
+      const attemptScroll = () => {
+        const element = document.getElementById(`comment-${commentId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+
+        if (retries < maxRetries) {
+          retries++;
+          setTimeout(attemptScroll, 200);
+        }
+      };
+
+      attemptScroll();
+    };
+
+    handleAnchor();
+    window.addEventListener("hashchange", handleAnchor);
+    return () => window.removeEventListener("hashchange", handleAnchor);
+  }, [isLoading, data]);
+
+  if (session && (isLoading || !data)) {
+    return <VhastroCommentSectionSkeleton />;
+  }
+
+  return (
+    <div className="space-y-6">
+      {session && (
+        <h2 className="text-xl font-bold vhastro-text-90">
+          {m.comments_count({ count: totalCount })}
+        </h2>
+      )}
+
+      {/* Main Editor */}
+      {session ? (
+        <VhastroCommentEditor
+          onSubmit={handleCreateComment}
+          isSubmitting={isCreating && !replyTarget}
+        />
+      ) : (
+        <div className="py-10 flex flex-col items-center justify-center gap-3 text-center">
+          <p className="text-sm vhastro-text-30">
+            {m.comments_join_discussion()}
+          </p>
+          <Link to="/login">
+            <button className="vhastro-btn-primary h-9 px-5 text-sm rounded-lg gap-2">
+              <LogIn size={14} />
+              {m.comments_login()}
+            </button>
+          </Link>
+        </div>
+      )}
+
+      {/* Comments List — 仅登录后可见；未登录访客完全封锁评论区内容 */}
+      {session && (
+        <>
+          <VhastroCommentList
+            rootComments={rootComments}
+            target={target}
+            onReply={(rootIdArg, commentId, userName) =>
+              setReplyTarget({ rootId: rootIdArg, commentId, userName })
+            }
+            onDelete={(id) => setCommentToDelete(id)}
+            replyTarget={replyTarget}
+            onCancelReply={() => setReplyTarget(null)}
+            onSubmitReply={handleCreateReply}
+            isSubmittingReply={isCreating}
+            initialExpandedRootId={rootId}
+            highlightCommentId={highlightCommentId}
+          />
+
+          {/* Load More Root Comments */}
+          {hasNextPage && (
+            <div className="flex justify-center pt-4">
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="vhastro-btn-regular h-10 px-6 text-sm rounded-lg disabled:opacity-50"
+              >
+                {isFetchingNextPage
+                  ? m.comments_loading()
+                  : m.comments_load_more()}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <VhastroConfirmationModal
+        isOpen={!!commentToDelete}
+        onClose={() => setCommentToDelete(null)}
+        onConfirm={handleDelete}
+        title={m.comments_delete_title()}
+        message={m.comments_delete_desc()}
+        confirmLabel={m.comments_delete_confirm()}
+        isDanger={true}
+        isLoading={isDeleting}
+      />
+    </div>
+  );
+}
+
+function VhastroCommentSectionSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-7 w-24 rounded-lg" />
+      <Skeleton className="h-32 w-full rounded-(--vhastro-radius-large)" />
+      <div className="space-y-0">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="py-6 flex gap-4 border-b border-black/5 dark:border-white/5"
+          >
+            <Skeleton className="w-9 h-9 rounded-full shrink-0" />
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-20 rounded" />
+                <Skeleton className="h-3 w-16 rounded" />
+              </div>
+              <div className="space-y-1.5">
+                <Skeleton className="h-3.5 w-full rounded" />
+                <Skeleton className="h-3.5 w-3/4 rounded" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

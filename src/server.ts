@@ -1,0 +1,60 @@
+import { handleQueueBatch } from "@/lib/queue/queue.handler";
+
+export { CommentModerationWorkflow } from "@/features/comments/workflows/comment-moderation";
+export { ExportWorkflow } from "@/features/import-export/workflows/export.workflow";
+export { ImportWorkflow } from "@/features/import-export/workflows/import.workflow";
+export { PostAutoSnapshotWorkflow } from "@/features/posts/workflows/post-auto-snapshot";
+export { PostProcessWorkflow } from "@/features/posts/workflows/post-process";
+export { ScheduledPublishWorkflow } from "@/features/posts/workflows/scheduled-publish";
+export { PasswordHasher } from "@/lib/do/password-hasher";
+export { RateLimiter } from "@/lib/do/rate-limiter";
+
+declare module "@tanstack/react-start" {
+  interface Register {
+    server: {
+      requestContext: {
+        env: Env;
+        executionCtx: ExecutionContext<unknown>;
+      };
+    };
+  }
+}
+
+declare module "@tanstack/router-core" {
+  interface Register {
+    server: {
+      requestContext: {
+        env: Env;
+        executionCtx: ExecutionContext<unknown>;
+      };
+    };
+  }
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    const { handleRootRequest } = await import("@/lib/worker/root-handler");
+    return handleRootRequest(request, env, ctx);
+  },
+  async queue(batch, env, ctx) {
+    await handleQueueBatch(batch, env, ctx);
+  },
+  async scheduled(_controller, env, ctx) {
+    const { checkAndDispatchUsageAlerts } = await import(
+      "@/features/cloudflare-usage/service/cloudflare-usage-alerts.service"
+    );
+    const { cleanupStorageFallbackTables } = await import(
+      "@/features/cache/storage-maintenance"
+    );
+    // 密钥兜底同步（ADMIN_PASSWORD / USER_PASSWORDS）：冷启动钩子错过后，每小时定时任务补偿
+    const { syncAdminPasswordFromEnv, syncUserPasswordsFromEnv } = await import(
+      "@/features/auth/runtime-password-sync.server"
+    );
+    await Promise.allSettled([
+      checkAndDispatchUsageAlerts(env, ctx),
+      cleanupStorageFallbackTables(env),
+      syncAdminPasswordFromEnv(env),
+      syncUserPasswordsFromEnv(env),
+    ]);
+  },
+} satisfies ExportedHandler<Env>;

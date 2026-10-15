@@ -1,0 +1,888 @@
+/* Theme: vhastro — vhAstro 设计令牌与工具类
+ * 取值来源：uxiaohan/vhAstro-Theme 的
+ *   src/config.ts        (--vh-main-color / --vh-font-color / --vh-aside-width
+ *                         / --vh-main-radius / --vh-main-max-width)
+ *   src/styles/Base.less (--vh-white-color / --vh-box-shadow / --vh-body-bg
+ *                         / --vh-font-* / 语义色 --vh-default|info|success|…)
+ *   src/components 各模块的 .less (Header / MainHeader / ArticleCard / Aside /
+ *                         Footer / Pagination / BackTop / MobileSidebar)
+ */
+@import "tailwindcss";
+@import "@/styles/shared.css";
+@import "./markdown.css";
+@plugin "@tailwindcss/typography";
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  :root {
+    /* ── vhAstro 结构令牌 ── */
+    --vhastro-max-width: 1458px; /* --vh-main-max-width */
+    --vhastro-page-width: var(--vhastro-max-width);
+    --vhastro-aside-width: 318px; /* --vh-aside-width */
+    --vhastro-header-height: 66px;
+    --vhastro-banner-height: 38.88rem; /* 首页首屏 */
+    --vhastro-banner-height-page: 28.88rem; /* 内页横幅 */
+    --vhastro-aside-gap: 1rem;
+    --vhastro-radius-large: 1rem; /* 卡片圆角（源主题 1rem / 0.88rem） */
+    --vhastro-radius-small: 0.5rem;
+    --vhastro-content-delay: 150ms;
+
+    /* 卡片阴影 —— 源主题 --vh-box-shadow: 0 3px 8px 6px #07111b0d */
+    --vhastro-card-shadow: 0 3px 8px 6px rgba(7, 17, 27, 0.05);
+    --vhastro-card-shadow-hover: 0 3px 8px 6px rgba(7, 17, 27, 0.09);
+    --vhastro-nav-shadow: 0 3px 8px 6px rgba(7, 17, 27, 0.05);
+
+    /* ── 浅色模式
+         主色 --vhastro-theme 可由主题设置覆盖（源主题为 #01C4B6），
+         其余色值均通过 color-mix 从基准色派生，明暗两套色板自动联动 ── */
+    --vhastro-theme: #01c4b6;
+    --vhastro-font-color: #34495e;
+    --vhastro-white-color: #ffffff;
+    --vhastro-body-bg: #f8f8f8;
+
+    --vhastro-primary: var(--vhastro-theme);
+    --vhastro-primary-hover: color-mix(
+      in srgb,
+      var(--vhastro-theme) 86%,
+      #000000
+    );
+    --vhastro-primary-active: color-mix(
+      in srgb,
+      var(--vhastro-theme) 74%,
+      #000000
+    );
+    --vhastro-primary-88: color-mix(
+      in srgb,
+      var(--vhastro-theme) 88%,
+      transparent
+    );
+    --vhastro-primary-66: color-mix(
+      in srgb,
+      var(--vhastro-theme) 66%,
+      transparent
+    );
+    --vhastro-primary-56: color-mix(
+      in srgb,
+      var(--vhastro-theme) 56%,
+      transparent
+    );
+    --vhastro-primary-28: color-mix(
+      in srgb,
+      var(--vhastro-theme) 28%,
+      transparent
+    );
+    --vhastro-primary-16: color-mix(
+      in srgb,
+      var(--vhastro-theme) 16%,
+      transparent
+    );
+    --vhastro-primary-6: color-mix(
+      in srgb,
+      var(--vhastro-theme) 6%,
+      transparent
+    );
+
+    --vhastro-page-bg: var(--vhastro-body-bg);
+    --vhastro-card-bg: var(--vhastro-white-color);
+    --vhastro-text-color: var(--vhastro-font-color);
+
+    /* 字体色阶 —— 源主题 --vh-font-88/66/56/28/16/6（相对 --vh-font-color） */
+    --vhastro-font-88: color-mix(
+      in srgb,
+      var(--vhastro-font-color) 88%,
+      transparent
+    );
+    --vhastro-font-66: color-mix(
+      in srgb,
+      var(--vhastro-font-color) 66%,
+      transparent
+    );
+    --vhastro-font-56: color-mix(
+      in srgb,
+      var(--vhastro-font-color) 56%,
+      transparent
+    );
+    --vhastro-font-28: color-mix(
+      in srgb,
+      var(--vhastro-font-color) 28%,
+      transparent
+    );
+    --vhastro-font-16: color-mix(
+      in srgb,
+      var(--vhastro-font-color) 16%,
+      transparent
+    );
+    --vhastro-font-6: color-mix(
+      in srgb,
+      var(--vhastro-font-color) 6%,
+      transparent
+    );
+
+    /* 字体色阶的变量别名（供 text-(--vhastro-text-*) 形式直接引用） */
+    --vhastro-text-90: var(--vhastro-font-88);
+    --vhastro-text-75: var(--vhastro-font-66);
+    --vhastro-text-50: var(--vhastro-font-56);
+    --vhastro-text-30: var(--vhastro-font-16);
+
+    /* 语义色 —— 源主题 Base.less */
+    --vhastro-default: #bec4cc;
+    --vhastro-info: #3253b4;
+    --vhastro-success: #01c4b6;
+    --vhastro-warning: #dd8636;
+    --vhastro-error: #de3c3d;
+    --vhastro-import: #b984df;
+
+    --vhastro-btn-content: var(--vhastro-theme);
+    --vhastro-btn-regular-bg: color-mix(
+      in srgb,
+      var(--vhastro-theme) 8%,
+      transparent
+    );
+    --vhastro-btn-regular-bg-hover: color-mix(
+      in srgb,
+      var(--vhastro-theme) 15%,
+      transparent
+    );
+    --vhastro-btn-regular-bg-active: color-mix(
+      in srgb,
+      var(--vhastro-theme) 22%,
+      transparent
+    );
+    --vhastro-btn-plain-bg-hover: color-mix(
+      in srgb,
+      var(--vhastro-theme) 8%,
+      transparent
+    );
+    --vhastro-btn-plain-bg-active: color-mix(
+      in srgb,
+      var(--vhastro-theme) 14%,
+      transparent
+    );
+    --vhastro-enter-btn-bg: var(--vhastro-btn-regular-bg);
+    --vhastro-enter-btn-bg-hover: var(--vhastro-btn-regular-bg-hover);
+    --vhastro-enter-btn-bg-active: var(--vhastro-btn-regular-bg-active);
+    --vhastro-meta-divider: color-mix(
+      in srgb,
+      var(--vhastro-font-color) 20%,
+      transparent
+    );
+    --vhastro-selection-bg: var(--vhastro-primary-88);
+    --vhastro-inline-code-bg: var(--vhastro-font-16);
+    --vhastro-inline-code-color: var(--vhastro-theme);
+    --vhastro-input-bg: var(--vhastro-font-6);
+    --vhastro-input-border: var(--vhastro-font-16);
+    --vhastro-toc-btn-hover: var(--vhastro-primary-6);
+    --vhastro-toc-btn-active: var(--vhastro-primary-16);
+    --vhastro-link-underline: var(--vhastro-primary-28);
+    --vhastro-codeblock-selection: var(--vhastro-primary-28);
+    --vhastro-code-bg: #f3f4f7; /* 源主题 pre.astro-code 底色 */
+    --vhastro-border: var(--vhastro-font-16);
+
+    /* 头部导航：半透明白 + 2rem 背景模糊（源主题 Header.less） */
+    --vhastro-header-bg: rgba(255, 255, 255, 0.36);
+    --vhastro-header-bg-solid: rgba(255, 255, 255, 0.72);
+  }
+
+  .dark {
+    /* ── 暗色模式 ── */
+    --vhastro-font-color: rgb(226, 232, 240);
+    --vhastro-white-color: rgb(31, 41, 55);
+    --vhastro-body-bg: rgb(17, 24, 39);
+
+    --vhastro-primary: color-mix(
+      in srgb,
+      var(--vhastro-theme) 78%,
+      #ffffff
+    );
+    --vhastro-primary-hover: color-mix(
+      in srgb,
+      var(--vhastro-theme) 62%,
+      #ffffff
+    );
+    --vhastro-primary-active: color-mix(
+      in srgb,
+      var(--vhastro-theme) 48%,
+      #ffffff
+    );
+
+    /* 语义色在暗色下提亮以保持可读性 */
+    --vhastro-info: #7c9df5;
+    --vhastro-warning: #e5a552;
+    --vhastro-import: #c9a0e8;
+
+    --vhastro-btn-content: color-mix(
+      in srgb,
+      var(--vhastro-theme) 60%,
+      #ffffff
+    );
+    --vhastro-btn-regular-bg: color-mix(
+      in srgb,
+      var(--vhastro-theme) 22%,
+      transparent
+    );
+    --vhastro-btn-regular-bg-hover: color-mix(
+      in srgb,
+      var(--vhastro-theme) 32%,
+      transparent
+    );
+    --vhastro-btn-regular-bg-active: color-mix(
+      in srgb,
+      var(--vhastro-theme) 42%,
+      transparent
+    );
+    --vhastro-btn-plain-bg-hover: rgba(255, 255, 255, 0.08);
+    --vhastro-btn-plain-bg-active: rgba(255, 255, 255, 0.14);
+    --vhastro-enter-btn-bg: var(--vhastro-btn-regular-bg);
+    --vhastro-enter-btn-bg-hover: var(--vhastro-btn-regular-bg-hover);
+    --vhastro-enter-btn-bg-active: var(--vhastro-btn-regular-bg-active);
+    --vhastro-selection-bg: var(--vhastro-primary-88);
+    --vhastro-inline-code-bg: rgba(255, 255, 255, 0.1);
+    --vhastro-inline-code-color: color-mix(
+      in srgb,
+      var(--vhastro-theme) 55%,
+      #ffffff
+    );
+    --vhastro-input-bg: rgba(255, 255, 255, 0.06);
+    --vhastro-input-border: rgba(255, 255, 255, 0.14);
+    --vhastro-toc-btn-hover: rgba(255, 255, 255, 0.08);
+    --vhastro-toc-btn-active: rgba(255, 255, 255, 0.14);
+    --vhastro-code-bg: rgba(0, 0, 0, 0.3);
+    --vhastro-border: rgba(255, 255, 255, 0.14);
+    --vhastro-card-shadow: 0 3px 8px 6px rgba(0, 0, 0, 0.2);
+    --vhastro-card-shadow-hover: 0 3px 8px 6px rgba(0, 0, 0, 0.32);
+    --vhastro-nav-shadow: 0 3px 8px 6px rgba(0, 0, 0, 0.28);
+    --vhastro-header-bg: rgba(17, 24, 39, 0.42);
+    --vhastro-header-bg-solid: rgba(17, 24, 39, 0.72);
+  }
+
+  /* ── 语义化变量：映射到 vhAstro 令牌，
+       供后台管理页与通用 UI 组件沿用同一套视觉 ── */
+  :root {
+    --background: var(--vhastro-page-bg);
+    --foreground: var(--vhastro-text-color);
+
+    --muted: var(--vhastro-font-6);
+    --muted-foreground: var(--vhastro-font-66);
+
+    --popover: var(--vhastro-card-bg);
+    --popover-foreground: var(--vhastro-text-color);
+
+    --border: var(--vhastro-border);
+    --input: var(--vhastro-input-bg);
+
+    --primary: var(--vhastro-primary);
+    --primary-foreground: #ffffff;
+
+    --secondary: var(--vhastro-btn-regular-bg);
+    --secondary-foreground: var(--vhastro-btn-content);
+
+    --accent: var(--vhastro-btn-regular-bg);
+    --accent-foreground: var(--vhastro-btn-content);
+
+    --ring: var(--vhastro-primary);
+
+    --destructive: var(--vhastro-error);
+    --destructive-foreground: #ffffff;
+
+    --warning: var(--vhastro-warning);
+    --warning-foreground: #1f2937;
+
+    --info: var(--vhastro-info);
+    --info-foreground: #ffffff;
+
+    --selection: var(--vhastro-primary);
+    --selection-foreground: #ffffff;
+  }
+
+  .dark {
+    --background: var(--vhastro-page-bg);
+    --foreground: var(--vhastro-text-color);
+
+    --muted: rgba(255, 255, 255, 0.06);
+    --muted-foreground: rgba(255, 255, 255, 0.62);
+
+    --popover: var(--vhastro-card-bg);
+    --popover-foreground: var(--vhastro-text-color);
+
+    --border: var(--vhastro-border);
+    --input: var(--vhastro-input-bg);
+
+    --primary: var(--vhastro-primary);
+    --primary-foreground: #0b1220;
+
+    --secondary: var(--vhastro-btn-regular-bg);
+    --secondary-foreground: var(--vhastro-btn-content);
+
+    --accent: var(--vhastro-btn-regular-bg);
+    --accent-foreground: var(--vhastro-btn-content);
+
+    --ring: var(--vhastro-primary);
+
+    --destructive: #ff6369;
+    --destructive-foreground: #ffffff;
+
+    --warning: #e5a552;
+    --warning-foreground: #1f2937;
+
+    --info: #7c9df5;
+    --info-foreground: #0b1220;
+
+    --selection: var(--vhastro-primary);
+    --selection-foreground: #0b1220;
+  }
+
+  body {
+    font-family:
+      "HarmonyOS Sans SC", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+      Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei",
+      sans-serif;
+    color: var(--vhastro-text-color);
+    background-color: var(--vhastro-page-bg);
+  }
+
+  /* 源主题：body::before 固定铺一层极淡的底纹（opacity .188） */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.5;
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in srgb, var(--vhastro-font-color) 8%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--vhastro-font-color) 8%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 32px 32px;
+  }
+
+  pre,
+  code,
+  .font-mono {
+    font-family:
+      "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
+}
+
+@layer components {
+  /* vhAstro 卡片：白底 + 1rem 圆角 + 源主题阴影 */
+  .vhastro-card-base {
+    border-radius: var(--vhastro-radius-large);
+    overflow: hidden;
+    background-color: var(--vhastro-card-bg);
+    box-shadow: var(--vhastro-card-shadow);
+    transition:
+      background-color 0.3s,
+      box-shadow 0.25s,
+      color 0.3s;
+  }
+
+  .vhastro-card-base.vhastro-card-hover:hover {
+    box-shadow: var(--vhastro-card-shadow-hover);
+  }
+
+  /* ── 文章卡片（源主题 ArticleCard.less）── */
+  .vhastro-essay-item {
+    display: flex;
+    position: relative;
+    overflow: hidden;
+    background-color: var(--vhastro-card-bg);
+    border: 1px solid var(--vhastro-font-16);
+    border-radius: var(--vhastro-radius-large);
+    transition:
+      box-shadow 0.25s,
+      transform 0.25s,
+      border-color 0.25s;
+  }
+
+  .vhastro-essay-item:hover {
+    border-color: var(--vhastro-primary-28);
+    box-shadow: var(--vhastro-card-shadow);
+  }
+
+  .vhastro-essay-item-list {
+    height: 16rem;
+  }
+
+  .vhastro-essay-cover {
+    position: relative;
+    overflow: hidden;
+    flex: 0 0 40%;
+  }
+
+  .vhastro-essay-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+  }
+
+  .vhastro-essay-item:hover .vhastro-essay-cover img {
+    transform: scale(1.08);
+  }
+
+  /* 置顶徽标：源主题左上角 -45° 半透明模糊标签 */
+  .vhastro-pin-badge {
+    position: absolute;
+    top: 1.6rem;
+    left: 0.56rem;
+    z-index: 20;
+    padding: 0.18rem 0.88rem;
+    border-radius: 0.66rem;
+    background: rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2rem 1rem rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #fff;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    transform: rotate(-45deg);
+  }
+
+  /* 分类渐变文字（源主题 .vh-article-cat） */
+  .vhastro-cat-gradient {
+    font-weight: 700;
+    background: linear-gradient(
+      118deg,
+      var(--vhastro-cat-1, #a32cc4),
+      var(--vhastro-cat-2, #b65fcf) 26%,
+      var(--vhastro-cat-3, #e39ff6)
+    );
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .vhastro-btn-regular {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--vhastro-btn-regular-bg);
+    color: var(--vhastro-btn-content);
+    transition:
+      background-color 0.2s,
+      color 0.2s;
+  }
+  .vhastro-btn-regular:hover {
+    background-color: var(--vhastro-btn-regular-bg-hover);
+  }
+  .vhastro-btn-regular:active {
+    background-color: var(--vhastro-btn-regular-bg-active);
+  }
+
+  .vhastro-btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--vhastro-primary);
+    color: #ffffff;
+    transition:
+      background-color 0.2s,
+      color 0.2s,
+      opacity 0.2s;
+  }
+  .vhastro-btn-primary:hover {
+    background-color: var(--vhastro-primary-hover);
+  }
+  .vhastro-btn-primary:active {
+    background-color: var(--vhastro-primary-active);
+  }
+  .vhastro-btn-primary:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .dark .vhastro-btn-primary {
+    color: #0b1220;
+  }
+
+  .vhastro-text-90 {
+    color: var(--vhastro-font-88);
+  }
+
+  .vhastro-text-75 {
+    color: var(--vhastro-font-66);
+  }
+
+  .vhastro-text-70 {
+    color: var(--vhastro-font-66);
+  }
+
+  .vhastro-text-50 {
+    color: var(--vhastro-font-56);
+  }
+
+  .vhastro-text-40 {
+    color: var(--vhastro-font-28);
+  }
+
+  .vhastro-text-30 {
+    color: var(--vhastro-font-16);
+  }
+
+  .vhastro-meta-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--vhastro-radius-small);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--vhastro-btn-regular-bg);
+    color: var(--vhastro-btn-content);
+    margin-right: 0.5rem;
+    transition:
+      background-color 0.2s,
+      color 0.2s;
+  }
+
+  .vhastro-expand-animation {
+    position: relative;
+    z-index: 0;
+  }
+  .vhastro-expand-animation::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    scale: 0.85;
+    z-index: -1;
+    transition:
+      scale 0.2s ease-out,
+      background-color 0.2s;
+  }
+  .vhastro-expand-animation:hover::before {
+    scale: 1;
+    background-color: var(--vhastro-btn-plain-bg-hover);
+  }
+  .vhastro-expand-animation:active::before {
+    background-color: var(--vhastro-btn-plain-bg-active);
+  }
+
+  .vhastro-timeline-dash {
+    position: relative;
+  }
+  .vhastro-timeline-dash::before {
+    content: "";
+    position: absolute;
+    width: 10%;
+    height: 100%;
+    left: calc(50% - 1px);
+    border-left: 2px dashed var(--vhastro-border);
+    pointer-events: none;
+    transition: all 0.3s;
+    transform: translateY(-50%);
+  }
+
+  .vhastro-code-folding-wrapper {
+    @apply relative transition-[max-height] duration-500 ease-in-out overflow-x-auto overflow-y-hidden;
+  }
+
+  .vhastro-code-mask {
+    @apply absolute bottom-0 left-0 right-0 h-24 pointer-events-none;
+    background: linear-gradient(to bottom, transparent, var(--vhastro-code-bg));
+    z-index: 10;
+  }
+
+  .vhastro-toc-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--vhastro-input-border) transparent;
+  }
+  .vhastro-toc-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .vhastro-toc-scrollbar::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+  .vhastro-toc-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--vhastro-input-border);
+    border-radius: 4px;
+    border: none;
+  }
+
+  /* 侧栏卡片（源主题 Aside.less .vh-aside-item） */
+  .vhastro-aside-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.28rem;
+    width: 100%;
+    border-radius: var(--vhastro-radius-large);
+    background-color: var(--vhastro-card-bg);
+    box-shadow: var(--vhastro-card-shadow);
+    overflow: hidden;
+  }
+
+  /* 侧栏条目标题 */
+  .vhastro-aside-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--vhastro-font-88);
+  }
+  .vhastro-aside-title svg {
+    color: var(--vhastro-theme);
+  }
+
+  /* 分类/标签行 hover：源主题 padding-left + 主色 66% 背景 */
+  .vhastro-aside-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 2.18rem;
+    padding: 0 0.5rem;
+    border-radius: 0.38rem;
+    font-size: 0.88rem;
+    transition: all 0.18s ease-in-out;
+  }
+  .vhastro-aside-row:hover {
+    padding-left: 0.66rem;
+    background-color: var(--vhastro-primary-66);
+    color: var(--vhastro-white-color);
+  }
+}
+
+/* vhAstro 首屏进入动画（源主题 @keyframes vh-init-show） */
+@keyframes vhastro-fade-in-up {
+  0% {
+    transform: translateY(2rem);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.vhastro-onload-animation {
+  opacity: 0;
+  animation: 300ms vhastro-fade-in-up ease-out forwards;
+}
+
+/* 打字机光标（源主题 MainHeader.less） */
+@keyframes vhastro-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.vhastro-typewriter-cursor::after {
+  content: "|";
+  display: inline-block;
+  padding-left: 0.188rem;
+  animation: vhastro-blink 1s infinite;
+  color: #fff;
+}
+
+/* 头像悬浮旋转（源主题 .header-main > .avatar:hover） */
+.vhastro-avatar-spin {
+  transition: transform 0.3s ease-in-out;
+}
+.vhastro-avatar-spin:hover {
+  transform: rotate(18.88deg);
+}
+
+::selection {
+  background-color: var(--vhastro-selection-bg);
+  color: #fff;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--vhastro-primary);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  transition: all 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--vhastro-primary-hover);
+  border-width: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   vhAstro admin backend — native visual system (.vhastro-admin)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.vhastro-admin {
+  background-color: var(--vhastro-page-bg);
+  color: var(--vhastro-text-color);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --fa-radius-md: 0.75rem;
+}
+
+.vhastro-admin {
+  --border: var(--vhastro-input-border);
+  --muted: var(--vhastro-btn-regular-bg);
+  --muted-foreground: var(--vhastro-font-66);
+}
+.dark .vhastro-admin {
+  --border: rgba(255, 255, 255, 0.14);
+  --muted: rgba(255, 255, 255, 0.06);
+  --muted-foreground: rgba(255, 255, 255, 0.6);
+}
+
+.vhastro-admin :is(.font-serif, .font-mono) {
+  font-family: inherit;
+}
+.vhastro-admin :is(.text-[9px], .text-[10px], .text-[11px]) {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.vhastro-admin .uppercase {
+  text-transform: none;
+}
+.vhastro-admin .tracking-widest,
+.vhastro-admin .tracking-wider {
+  letter-spacing: 0.01em;
+}
+.vhastro-admin
+  :is(
+    .border-border,
+    .border-border\/20,
+    .border-border\/25,
+    .border-border\/30,
+    .border-border\/40,
+    .border-border\/50
+  ) {
+  border-color: var(--vhastro-input-border);
+}
+.vhastro-admin
+  :is(
+    .bg-muted\/5,
+    .bg-muted\/10,
+    .bg-muted\/20,
+    .bg-accent\/5,
+    .bg-accent\/10,
+    .bg-secondary\/10,
+    .bg-background\/50,
+    .bg-background\/60,
+    .bg-background\/70,
+    .bg-background\/90,
+    .bg-background\/95,
+    .bg-background\/96
+  ) {
+  background-color: var(--vhastro-card-bg);
+}
+.vhastro-admin
+  :is(
+    .text-muted-foreground\/40,
+    .text-muted-foreground\/50,
+    .text-muted-foreground\/60,
+    .text-muted-foreground\/70,
+    .text-muted-foreground\/80
+  ) {
+  color: var(--vhastro-font-66);
+}
+.dark
+  .vhastro-admin
+  :is(
+    .text-muted-foreground\/40,
+    .text-muted-foreground\/50,
+    .text-muted-foreground\/60,
+    .text-muted-foreground\/70,
+    .text-muted-foreground\/80
+  ) {
+  color: rgba(255, 255, 255, 0.6);
+}
+.vhastro-admin button.bg-muted {
+  background-color: var(--vhastro-btn-regular-bg);
+}
+.vhastro-admin tr:hover,
+.vhastro-admin [role="row"]:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--vhastro-primary) 3%,
+    var(--vhastro-card-bg)
+  );
+}
+.vhastro-admin :is(input, textarea, select) {
+  border-radius: var(--fa-radius-md);
+}
+.vhastro-admin .border-foreground {
+  border-color: var(--vhastro-primary);
+}
+
+body:has(.vhastro-admin) div:not(.admin-layout).relative.bg-background.border,
+body:has(.vhastro-admin) aside.relative.bg-background {
+  border-radius: var(--vhastro-radius-large);
+  background-color: var(--vhastro-card-bg);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 4px 24px rgb(0 0 0 / 0.1);
+}
+body:has(.vhastro-admin) :is(.font-serif, .font-mono) {
+  font-family: inherit;
+}
+body:has(.vhastro-admin) :is(.text-[9px], .text-[10px], .text-[11px]) {
+  font-size: 13px;
+}
+body:has(.vhastro-admin) .uppercase {
+  text-transform: none;
+}
+body:has(.vhastro-admin) :is(.tracking-widest, .tracking-wider) {
+  letter-spacing: 0.01em;
+}
+body:has(.vhastro-admin) .bg-foreground {
+  background-color: var(--vhastro-primary);
+}
+body:has(.vhastro-admin) .bg-foreground.text-background {
+  color: #fff;
+}
+.dark body:has(.vhastro-admin) .bg-foreground.text-background {
+  color: rgb(0 0 0 / 0.78);
+}
