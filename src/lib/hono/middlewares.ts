@@ -58,6 +58,19 @@ export const securityHeadersMiddleware = createMiddleware(async (c, next) => {
     if (!headers.has(name)) headers.set(name, value);
   };
 
+  // 兜底：任何 5xx 都不得被浏览器或 CDN 缓存。
+  // 部分路由（如站点文档）会在构建响应时就写入较长的 Cache-Control，
+  // 一旦处理过程中抛错返回 5xx，那些长缓存头会被继承，导致错误响应被
+  // 边缘缓存并在故障恢复后继续对外返回。此处强制覆盖为不缓存。
+  if (c.res.status >= 500) {
+    headers.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, max-age=0",
+    );
+    headers.set("CDN-Cache-Control", "no-store");
+    headers.set("Cloudflare-CDN-Cache-Control", "no-store");
+  }
+
   setIfAbsent("X-Content-Type-Options", "nosniff");
   setIfAbsent("X-Frame-Options", "SAMEORIGIN");
   setIfAbsent("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -99,11 +112,26 @@ const tryCacheResponse = (c: Context, cache: Cache) => {
     });
   }
 
+  // 5xx 一律不交给边缘缓存。
+  // 站点文档路由（sitemap/rss/robots/manifest）会预先设置较长的
+  // Cache-Control（如 s-maxage=3600，robots 达 86400），若冷启动或
+  // 临时故障期间产生 5xx，该错误响应会连同这个长 s-maxage 一起被
+  // Cloudflare 边缘缓存，导致故障恢复后仍持续对外返回错误。
+  // 这里直接把 5xx 的缓存头收紧为不可缓存，从根源上避免该问题。
+  if (c.res.status >= 500) {
+    c.res.headers.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, max-age=0",
+    );
+    c.res.headers.set("CDN-Cache-Control", "no-store");
+    c.res.headers.set("Cloudflare-CDN-Cache-Control", "no-store");
+    return;
+  }
+
   const resCacheControl = c.res.headers.get("Cache-Control");
   const hasSetCookie = c.res.headers.has("Set-Cookie");
 
-  const isStatusCacheable =
-    c.res.status === 200 || c.res.status === 404 || c.res.status >= 500;
+  const isStatusCacheable = c.res.status === 200 || c.res.status === 404;
 
   const isCacheable =
     isStatusCacheable &&

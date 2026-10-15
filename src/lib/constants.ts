@@ -26,8 +26,11 @@ export const CACHE_CONTROL = {
     "CDN-Cache-Control": "public, s-maxage=10",
   },
   serverError: {
-    "Cache-Control": "public, max-age=0, must-revalidate",
-    "CDN-Cache-Control": "public, s-maxage=10",
+    // 5xx 绝不缓存：错误响应一旦被边缘/浏览器缓存，故障恢复后仍会持续
+    // 对外返回错误（尤其站点文档类路由带较长 s-maxage 时更明显）。
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "CDN-Cache-Control": "no-store",
+    "Cloudflare-CDN-Cache-Control": "no-store",
   },
   private: {
     "Cache-Control": "private, no-store, no-cache, must-revalidate",
