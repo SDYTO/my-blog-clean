@@ -9,6 +9,7 @@ import {
 } from "@/features/challenge/service/challenge.service";
 import { makeFullSitePassCookie } from "@/features/challenge/service/fullsite.service";
 import * as ConfigService from "@/features/config/service/config.service";
+import { handleOtpSend } from "@/features/email-otp/api/hono/otp.route";
 import { imageHostingUploadRoute } from "@/features/image-hosting/api/hono/upload.route";
 import { exportDownloadRoute } from "@/features/import-export/api/hono/download.route";
 import { mediaUploadRoute } from "@/features/media/api/hono/upload.route";
@@ -30,7 +31,6 @@ import postsRelatedRoute from "@/features/posts/api/hono/posts.related.route";
 import postsUnlockRoute from "@/features/posts/api/hono/posts.unlock.route";
 import searchRoute from "@/features/search/api/hono/search.route";
 import siteDocumentsRoute from "@/features/site-documents/api/hono/site-documents.route";
-import { handleOtpSend } from "@/features/email-otp/api/hono/otp.route";
 import tagsRoute from "@/features/tags/api/hono/tags.list.route";
 import wechatVerifyRoute from "@/features/wechat-verify/api/hono/wechat-verify.route";
 import { serverEnv } from "@/lib/env/server.env";
@@ -42,10 +42,15 @@ import {
   cacheMiddleware,
   challengeMiddleware,
   rateLimitMiddleware,
+  securityHeadersMiddleware,
   shieldMiddleware,
 } from "./middlewares";
 
 export const app = new Hono<{ Bindings: Env }>();
+
+// 安全响应头挂在最外层：先于其他中间件注册，确保所有响应（页面 / API /
+// 静态资源 / 缓存命中 / 4xx）都带上安全头。
+app.use("*", securityHeadersMiddleware);
 
 app.get("*", cacheMiddleware);
 

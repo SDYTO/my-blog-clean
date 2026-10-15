@@ -34,6 +34,54 @@ export const baseMiddleware = createMiddleware<{ Bindings: Env }>(
   },
 );
 
+/**
+ * 安全响应头中间件。
+ *
+ * 统一为所有响应注入基础安全头，缓解点击劫持、MIME 嗅探、协议降级与
+ * Referer 信息外泄等风险。挂在最外层（见 routes.ts），因此对页面、API、
+ * 静态资源均生效。
+ *
+ * 说明：
+ * - HSTS 仅在 HTTPS 请求上下文中返回（Cloudflare 边缘已终止 TLS，
+ *   生产环境始终为 https，故生产必然下发；本地 http 调试不会误设）。
+ * - 不设置 Content-Security-Policy：站点使用主题动态资源、内联样式与
+ *   统计脚本，CSP 需按实际资源白名单单独调试，贸然启用会破坏页面。
+ *   如需加固，建议先在 Cloudflare Transform Rules 中以 Report-Only 观察。
+ * - 采用「不覆盖已有值」策略：若具体路由已自行设置同名头（如媒体路由
+ *   的 Cache-Control 类头），保留路由级更精确的取值。
+ */
+export const securityHeadersMiddleware = createMiddleware(async (c, next) => {
+  await next();
+
+  const headers = c.res.headers;
+  const setIfAbsent = (name: string, value: string) => {
+    if (!headers.has(name)) headers.set(name, value);
+  };
+
+  setIfAbsent("X-Content-Type-Options", "nosniff");
+  setIfAbsent("X-Frame-Options", "SAMEORIGIN");
+  setIfAbsent("Referrer-Policy", "strict-origin-when-cross-origin");
+  setIfAbsent(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), payment=()",
+  );
+  setIfAbsent("Cross-Origin-Opener-Policy", "same-origin");
+
+  // HSTS 仅对 HTTPS 下发，避免本地 http 开发时浏览器把 localhost 强制跳转
+  const isHttps =
+    c.req.url.startsWith("https://") ||
+    c.req.header("x-forwarded-proto") === "https";
+  if (isHttps) {
+    setIfAbsent(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains",
+    );
+  }
+
+  // HSTS 前置声明（Cloudflare 支持），预加载列表提交需另行申请
+  setIfAbsent("X-DNS-Prefetch-Control", "on");
+});
+
 const tryCacheResponse = (c: Context, cache: Cache) => {
   let strategy:
     | typeof CACHE_CONTROL.notFound
