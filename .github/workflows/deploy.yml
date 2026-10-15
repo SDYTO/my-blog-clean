@@ -171,3 +171,21 @@ jobs:
             -H "Content-Type: application/json" \
             --data "{\"hosts\":[$HOSTS]}"
           echo ""
+
+          # 站点文档（sitemap/rss/atom/feed/robots/manifest）走 Cloudflare 边缘缓存，
+          # 且带较长 s-maxage（robots 达 86400s）；若部署窗口内出现瞬时 5xx 被缓存，
+          # 在自然过期前会持续对外返回错误。这里按 URL 精准清理，确保部署后立即恢复。
+          PURGE_URLS=""
+          for P in /sitemap.xml /rss.xml /atom.xml /feed.json /robots.txt /site.webmanifest; do
+            for H in "$DOMAIN" "$CDN_DOMAIN"; do
+              [ -n "$H" ] || continue
+              [ "$PURGE_URLS" = "" ] || PURGE_URLS="$PURGE_URLS,"
+              PURGE_URLS="$PURGE_URLS\"https://$H$P\""
+            done
+          done
+          echo "Purging site documents: $PURGE_URLS"
+          curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+            -H "Authorization: Bearer $CLOUDFLARE_PURGE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "{\"files\":[$PURGE_URLS]}"
+          echo ""
