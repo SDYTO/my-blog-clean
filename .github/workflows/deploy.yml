@@ -75,6 +75,9 @@ jobs:
           echo "BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}" >> $GITHUB_ENV
           echo "BETTER_AUTH_URL=${{ secrets.BETTER_AUTH_URL }}" >> $GITHUB_ENV
           echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}" >> $GITHUB_ENV
+          # 运行时管理员密码：Worker 冷启动/整点定时任务会自动同步为 ADMIN_EMAIL
+          # 账户的登录密码（见 features/auth/runtime-password-sync.server.ts）
+          echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}" >> $GITHUB_ENV
           echo "GITHUB_CLIENT_ID=${{ secrets.GH_CLIENT_ID }}" >> $GITHUB_ENV
           echo "GITHUB_CLIENT_SECRET=${{ secrets.GH_CLIENT_SECRET }}" >> $GITHUB_ENV
           echo "GITHUB_TOKEN=${{ secrets.GH_TOKEN }}" >> $GITHUB_ENV
@@ -110,6 +113,7 @@ jobs:
             "BETTER_AUTH_SECRET": "$BETTER_AUTH_SECRET",
             "BETTER_AUTH_URL": "$BETTER_AUTH_URL",
             "ADMIN_EMAIL": "$ADMIN_EMAIL",
+            "ADMIN_PASSWORD": "$ADMIN_PASSWORD",
             "GITHUB_CLIENT_ID": "$GITHUB_CLIENT_ID",
             "GITHUB_CLIENT_SECRET": "$GITHUB_CLIENT_SECRET",
             "CLOUDFLARE_ZONE_ID": "$CLOUDFLARE_ZONE_ID",
