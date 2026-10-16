@@ -34,104 +34,7 @@ export const baseMiddleware = createMiddleware<{ Bindings: Env }>(
   },
 );
 
-/**
- * 安全响应头中间件。
- *
- * 统一为所有响应注入基础安全头，缓解点击劫持、MIME 嗅探、协议降级与
- * Referer 信息外泄等风险。挂在最外层（见 routes.ts），因此对页面、API、
- * 静态资源均生效。
- *
- * 说明：
- * - HSTS 仅在 HTTPS 请求上下文中返回（Cloudflare 边缘已终止 TLS，
- *   生产环境始终为 https，故生产必然下发；本地 http 调试不会误设）。
- * - 不设置 Content-Security-Policy：站点使用主题动态资源、内联样式与
- *   统计脚本，CSP 需按实际资源白名单单独调试，贸然启用会破坏页面。
- *   如需加固，建议先在 Cloudflare Transform Rules 中以 Report-Only 观察。
- * - 采用「不覆盖已有值」策略：若具体路由已自行设置同名头（如媒体路由
- *   的 Cache-Control 类头），保留路由级更精确的取值。
- */
-export const securityHeadersMiddleware = createMiddleware(async (c, next) => {
-  await next();
-
-  // 某些上游响应（caches.default.match() 命中、代理透传等）的 headers 是
-  // immutable 的，直接 set 会抛 "TypeError: Can't modify immutable headers"
-  // 并被上层转换为 500。这里先探测可写性，不可写则整体替换为可变副本。
-  let headers = c.res.headers;
-  try {
-    headers.set("X-Security-Header-Probe", "1");
-    headers.delete("X-Security-Header-Probe");
-  } catch {
-    headers = new Headers(c.res.headers);
-    c.res = new Response(c.res.body, {
-      status: c.res.status,
-      statusText: c.res.statusText,
-      headers,
-    });
-  }
-
-  const setIfAbsent = (name: string, value: string) => {
-    if (!headers.has(name)) headers.set(name, value);
-  };
-
-  // 兜底：任何 5xx 都不得被浏览器或 CDN 缓存。
-  // 部分路由（如站点文档）会在构建响应时就写入较长的 Cache-Control，
-  // 一旦处理过程中抛错返回 5xx，那些长缓存头会被继承，导致错误响应被
-  // 边缘缓存并在故障恢复后继续对外返回。此处强制覆盖为不缓存。
-  if (c.res.status >= 500) {
-    headers.set(
-      "Cache-Control",
-      "no-store, no-cache, must-revalidate, max-age=0",
-    );
-    headers.set("CDN-Cache-Control", "no-store");
-    headers.set("Cloudflare-CDN-Cache-Control", "no-store");
-  }
-
-  setIfAbsent("X-Content-Type-Options", "nosniff");
-  setIfAbsent("X-Frame-Options", "SAMEORIGIN");
-  setIfAbsent("Referrer-Policy", "strict-origin-when-cross-origin");
-  setIfAbsent(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(), payment=()",
-  );
-  setIfAbsent("Cross-Origin-Opener-Policy", "same-origin");
-
-  // HSTS 仅对 HTTPS 下发，避免本地 http 开发时浏览器把 localhost 强制跳转
-  const isHttps =
-    c.req.url.startsWith("https://") ||
-    c.req.header("x-forwarded-proto") === "https";
-  if (isHttps) {
-    setIfAbsent(
-      "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains",
-    );
-  }
-
-  // HSTS 前置声明（Cloudflare 支持），预加载列表提交需另行申请
-  setIfAbsent("X-DNS-Prefetch-Control", "on");
-});
-
 const tryCacheResponse = (c: Context, cache: Cache) => {
-  // 外层 Response 的 headers 在某些来源（caches.default.match()、
-  // 代理透传等）下是 immutable 的，直接 set 会抛
-  // "TypeError: Can't modify immutable headers"。
-  // 这里统一替换成可变 Headers 实例，避免改头时抛错。
-  const ensureMutableHeaders = () => {
-    const headers = c.res.headers;
-    try {
-      headers.set("X-Cache-Probe", "1");
-      headers.delete("X-Cache-Probe");
-      return headers;
-    } catch {
-      const mutable = new Headers(headers);
-      c.res = new Response(c.res.body, {
-        status: c.res.status,
-        statusText: c.res.statusText,
-        headers: mutable,
-      });
-      return mutable;
-    }
-  };
-
   let strategy:
     | typeof CACHE_CONTROL.notFound
     | typeof CACHE_CONTROL.serverError
@@ -143,33 +46,16 @@ const tryCacheResponse = (c: Context, cache: Cache) => {
     strategy = CACHE_CONTROL.serverError;
   }
   if (strategy) {
-    const headers = ensureMutableHeaders();
     Object.entries(strategy).forEach(([k, v]) => {
-      headers.set(k, v);
+      c.res.headers.set(k, v);
     });
-  }
-
-  // 5xx 一律不交给边缘缓存。
-  // 站点文档路由（sitemap/rss/robots/manifest）会预先设置较长的
-  // Cache-Control（如 s-maxage=3600，robots 达 86400），若冷启动或
-  // 临时故障期间产生 5xx，该错误响应会连同这个长 s-maxage 一起被
-  // Cloudflare 边缘缓存，导致故障恢复后仍持续对外返回错误。
-  // 这里直接把 5xx 的缓存头收紧为不可缓存，从根源上避免该问题。
-  if (c.res.status >= 500) {
-    const headers = ensureMutableHeaders();
-    headers.set(
-      "Cache-Control",
-      "no-store, no-cache, must-revalidate, max-age=0",
-    );
-    headers.set("CDN-Cache-Control", "no-store");
-    headers.set("Cloudflare-CDN-Cache-Control", "no-store");
-    return;
   }
 
   const resCacheControl = c.res.headers.get("Cache-Control");
   const hasSetCookie = c.res.headers.has("Set-Cookie");
 
-  const isStatusCacheable = c.res.status === 200 || c.res.status === 404;
+  const isStatusCacheable =
+    c.res.status === 200 || c.res.status === 404 || c.res.status >= 500;
 
   const isCacheable =
     isStatusCacheable &&
@@ -248,17 +134,7 @@ export const cacheMiddleware = createMiddleware(async (c, next) => {
   const cache = (caches as unknown as { default: Cache }).default;
 
   const cachedResponse = await cache.match(c.req.raw);
-  if (cachedResponse) {
-    // caches.default.match() 返回的 Response 其 headers 是 immutable 的，
-    // 外层中间件（如 securityHeadersMiddleware）一旦对其 set() 就会抛
-    // TypeError: Can't modify immutable headers，最终表现为 500。
-    // 这里统一返回一个可变副本，保证后续中间件能安全改写响应头。
-    return new Response(cachedResponse.body, {
-      status: cachedResponse.status,
-      statusText: cachedResponse.statusText,
-      headers: new Headers(cachedResponse.headers),
-    });
-  }
+  if (cachedResponse) return cachedResponse;
 
   await next();
 
