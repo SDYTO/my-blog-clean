@@ -53,7 +53,22 @@ export const baseMiddleware = createMiddleware<{ Bindings: Env }>(
 export const securityHeadersMiddleware = createMiddleware(async (c, next) => {
   await next();
 
-  const headers = c.res.headers;
+  // 某些上游响应（caches.default.match() 命中、代理透传等）的 headers 是
+  // immutable 的，直接 set 会抛 "TypeError: Can't modify immutable headers"
+  // 并被上层转换为 500。这里先探测可写性，不可写则整体替换为可变副本。
+  let headers = c.res.headers;
+  try {
+    headers.set("X-Security-Header-Probe", "1");
+    headers.delete("X-Security-Header-Probe");
+  } catch {
+    headers = new Headers(c.res.headers);
+    c.res = new Response(c.res.body, {
+      status: c.res.status,
+      statusText: c.res.statusText,
+      headers,
+    });
+  }
+
   const setIfAbsent = (name: string, value: string) => {
     if (!headers.has(name)) headers.set(name, value);
   };
@@ -96,6 +111,27 @@ export const securityHeadersMiddleware = createMiddleware(async (c, next) => {
 });
 
 const tryCacheResponse = (c: Context, cache: Cache) => {
+  // 外层 Response 的 headers 在某些来源（caches.default.match()、
+  // 代理透传等）下是 immutable 的，直接 set 会抛
+  // "TypeError: Can't modify immutable headers"。
+  // 这里统一替换成可变 Headers 实例，避免改头时抛错。
+  const ensureMutableHeaders = () => {
+    const headers = c.res.headers;
+    try {
+      headers.set("X-Cache-Probe", "1");
+      headers.delete("X-Cache-Probe");
+      return headers;
+    } catch {
+      const mutable = new Headers(headers);
+      c.res = new Response(c.res.body, {
+        status: c.res.status,
+        statusText: c.res.statusText,
+        headers: mutable,
+      });
+      return mutable;
+    }
+  };
+
   let strategy:
     | typeof CACHE_CONTROL.notFound
     | typeof CACHE_CONTROL.serverError
@@ -107,8 +143,9 @@ const tryCacheResponse = (c: Context, cache: Cache) => {
     strategy = CACHE_CONTROL.serverError;
   }
   if (strategy) {
+    const headers = ensureMutableHeaders();
     Object.entries(strategy).forEach(([k, v]) => {
-      c.res.headers.set(k, v);
+      headers.set(k, v);
     });
   }
 
@@ -119,12 +156,13 @@ const tryCacheResponse = (c: Context, cache: Cache) => {
   // Cloudflare 边缘缓存，导致故障恢复后仍持续对外返回错误。
   // 这里直接把 5xx 的缓存头收紧为不可缓存，从根源上避免该问题。
   if (c.res.status >= 500) {
-    c.res.headers.set(
+    const headers = ensureMutableHeaders();
+    headers.set(
       "Cache-Control",
       "no-store, no-cache, must-revalidate, max-age=0",
     );
-    c.res.headers.set("CDN-Cache-Control", "no-store");
-    c.res.headers.set("Cloudflare-CDN-Cache-Control", "no-store");
+    headers.set("CDN-Cache-Control", "no-store");
+    headers.set("Cloudflare-CDN-Cache-Control", "no-store");
     return;
   }
 
@@ -210,7 +248,17 @@ export const cacheMiddleware = createMiddleware(async (c, next) => {
   const cache = (caches as unknown as { default: Cache }).default;
 
   const cachedResponse = await cache.match(c.req.raw);
-  if (cachedResponse) return cachedResponse;
+  if (cachedResponse) {
+    // caches.default.match() 返回的 Response 其 headers 是 immutable 的，
+    // 外层中间件（如 securityHeadersMiddleware）一旦对其 set() 就会抛
+    // TypeError: Can't modify immutable headers，最终表现为 500。
+    // 这里统一返回一个可变副本，保证后续中间件能安全改写响应头。
+    return new Response(cachedResponse.body, {
+      status: cachedResponse.status,
+      statusText: cachedResponse.statusText,
+      headers: new Headers(cachedResponse.headers),
+    });
+  }
 
   await next();
 
